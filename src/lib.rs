@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta, Path};
+use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta, Path, Ident};
 
 /// Derives `From<T>` for the annotated enum where T is a smaller enum with a subset of variants.
 ///
@@ -12,7 +12,7 @@ use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta, Path};
 /// enum Smaller {
 ///     Unit,
 ///     Tuple(i32, &'static str),
-///     Struct { x: i32, y: i32 }
+///     DifferentName { x: i32, y: i32 }
 /// }
 ///
 /// #[derive(FromVariants)]
@@ -22,7 +22,7 @@ use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta, Path};
 ///     Unit,
 ///     #[from_variant]
 ///     Tuple(i64, String),
-///     #[from_variant]
+///     #[from_variant(DifferentName)]
 ///     Struct { x: f64, y: f64 },
 ///     Extra
 /// }
@@ -35,7 +35,7 @@ use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta, Path};
 /// let bigger: Bigger = smaller.into();
 /// assert!(matches!(bigger, Bigger::Tuple(42, ref s) if s == "hello"));
 ///
-/// let smaller = Smaller::Struct { x: 1, y: 2 };
+/// let smaller = Smaller::DifferentName { x: 1, y: 2 };
 /// let bigger: Bigger = smaller.into();
 /// assert!(matches!(bigger, Bigger::Struct { x, y } if x == 1.0 && y == 2.0));
 /// ```
@@ -57,18 +57,17 @@ pub fn derive_from_variants(input: TokenStream) -> TokenStream {
     // Generate match arms only for variants marked with #[from_variant]
     let match_arms = data.variants.iter().filter_map(|variant| {
         // Check if this variant has the #[from_variant] attribute
-        let has_from_variant = variant.attrs.iter().any(|attr| {
-            attr.path().is_ident("from_variant")
-        });
-
-        if !has_from_variant {
+        if !has_from_variant_attr(&variant.attrs) {
             return None;
         }
-
-        let variant_name = &variant.ident;
+        
+        let source_variant_name = extract_from_variant_name(&variant.attrs)
+            .unwrap_or_else(|| variant.ident.clone());
+        let target_variant_name = &variant.ident;
+        
         let arm = match &variant.fields {
             Fields::Unit => quote! {
-                #source_enum::#variant_name => #target_enum::#variant_name,
+                #source_enum::#source_variant_name => #target_enum::#target_variant_name,
             },
             Fields::Unnamed(fields) => {
                 let field_names: Vec<_> = (0..fields.unnamed.len())
@@ -78,7 +77,7 @@ pub fn derive_from_variants(input: TokenStream) -> TokenStream {
                     .map(|name| quote! { #name.into() })
                     .collect();
                 quote! {
-                    #source_enum::#variant_name(#(#field_names),*) => #target_enum::#variant_name(#(#field_conversions),*),
+                    #source_enum::#source_variant_name(#(#field_names),*) => #target_enum::#target_variant_name(#(#field_conversions),*),
                 }
             },
             Fields::Named(fields) => {
@@ -89,7 +88,7 @@ pub fn derive_from_variants(input: TokenStream) -> TokenStream {
                     .map(|name| quote! { #name: #name.into() })
                     .collect();
                 quote! {
-                    #source_enum::#variant_name { #(#field_names),* } => #target_enum::#variant_name { #(#field_conversions),* },
+                    #source_enum::#source_variant_name { #(#field_names),* } => #target_enum::#target_variant_name { #(#field_conversions),* },
                 }
             }
         };
@@ -116,6 +115,31 @@ fn extract_source_enum(attrs: &[Attribute]) -> Option<Path> {
                 if let Ok(path) = meta_list.parse_args::<Path>() {
                     return Some(path);
                 }
+            }
+        }
+    }
+    None
+}
+
+fn has_from_variant_attr(attrs: &[Attribute]) -> bool {
+    attrs.iter().any(|attr| attr.path().is_ident("from_variant"))
+}
+
+fn extract_from_variant_name(attrs: &[Attribute]) -> Option<Ident> {
+    for attr in attrs {
+        if attr.path().is_ident("from_variant") {
+            match &attr.meta {
+                Meta::Path(_) => {
+                    // #[from_variant] without arguments - return None to use target variant name
+                    return None;
+                },
+                Meta::List(meta_list) => {
+                    // #[from_variant(SourceVariant)] - use the specified name
+                    if let Ok(ident) = meta_list.parse_args::<Ident>() {
+                        return Some(ident);
+                    }
+                },
+                _ => continue,
             }
         }
     }
