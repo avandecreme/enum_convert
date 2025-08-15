@@ -181,22 +181,17 @@ impl Parse for VariantTarget {
 
 fn extract_target_enums(attrs: &[Attribute]) -> Option<Vec<Path>> {
     for attr in attrs {
-        if attr.path().is_ident("enum_into") {
-            if let Meta::List(meta_list) = &attr.meta {
-                if let Ok(args) = meta_list.parse_args::<ContainerIntoVariantsArgs>() {
-                    return Some(args.enums.into_iter().collect());
-                }
-            }
+        if attr.path().is_ident("enum_into")
+            && let Meta::List(meta_list) = &attr.meta
+            && let Ok(args) = meta_list.parse_args::<ContainerIntoVariantsArgs>()
+        {
+            return Some(args.enums.into_iter().collect());
         }
     }
     None
 }
 
-
-fn extract_enum_into_targets(
-    attrs: &[Attribute],
-    source_variant: &Ident,
-) -> Vec<(Path, Ident)> {
+fn extract_enum_into_targets(attrs: &[Attribute], source_variant: &Ident) -> Vec<(Path, Ident)> {
     for attr in attrs {
         if attr.path().is_ident("enum_into") {
             match &attr.meta {
@@ -229,15 +224,14 @@ fn extract_enum_into_targets(
 
 fn extract_field_mapping(field: &Field, target_enum: &Path) -> Option<Ident> {
     for attr in &field.attrs {
-        if attr.path().is_ident("enum_into") {
-            if let Meta::List(meta_list) = &attr.meta {
-                if let Ok(args) = meta_list.parse_args::<FieldIntoVariantsArgs>() {
-                    // Find the field mapping for this target enum
-                    for FieldTarget::EnumField(enum_name, field_name) in args.fields {
-                        if quote!(#enum_name).to_string() == quote!(#target_enum).to_string() {
-                            return Some(field_name);
-                        }
-                    }
+        if attr.path().is_ident("enum_into")
+            && let Meta::List(meta_list) = &attr.meta
+            && let Ok(args) = meta_list.parse_args::<FieldIntoVariantsArgs>()
+        {
+            // Find the field mapping for this target enum
+            for FieldTarget::EnumField(enum_name, field_name) in args.fields {
+                if quote!(#enum_name).to_string() == quote!(#target_enum).to_string() {
+                    return Some(field_name);
                 }
             }
         }
