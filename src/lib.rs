@@ -11,8 +11,8 @@ use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta, Path};
 ///
 /// enum Smaller {
 ///     Unit,
-///     Tuple(i32, String),
-///     Struct { x: f64, y: f64 }
+///     Tuple(i32, &'static str),
+///     Struct { x: i32, y: i32 }
 /// }
 ///
 /// #[derive(FromVariants)]
@@ -21,7 +21,7 @@ use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta, Path};
 ///     #[from_variant]
 ///     Unit,
 ///     #[from_variant]
-///     Tuple(i32, String),
+///     Tuple(i64, String),
 ///     #[from_variant]
 ///     Struct { x: f64, y: f64 },
 ///     Extra
@@ -31,11 +31,11 @@ use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta, Path};
 /// let bigger: Bigger = smaller.into();
 /// assert!(matches!(bigger, Bigger::Unit));
 ///
-/// let smaller = Smaller::Tuple(42, "hello".to_string());
+/// let smaller = Smaller::Tuple(42, "hello");
 /// let bigger: Bigger = smaller.into();
 /// assert!(matches!(bigger, Bigger::Tuple(42, ref s) if s == "hello"));
 ///
-/// let smaller = Smaller::Struct { x: 1.0, y: 2.0 };
+/// let smaller = Smaller::Struct { x: 1, y: 2 };
 /// let bigger: Bigger = smaller.into();
 /// assert!(matches!(bigger, Bigger::Struct { x, y } if x == 1.0 && y == 2.0));
 /// ```
@@ -60,11 +60,11 @@ pub fn derive_from_variants(input: TokenStream) -> TokenStream {
         let has_from_variant = variant.attrs.iter().any(|attr| {
             attr.path().is_ident("from_variant")
         });
-        
+
         if !has_from_variant {
             return None;
         }
-        
+
         let variant_name = &variant.ident;
         let arm = match &variant.fields {
             Fields::Unit => quote! {
@@ -74,16 +74,22 @@ pub fn derive_from_variants(input: TokenStream) -> TokenStream {
                 let field_names: Vec<_> = (0..fields.unnamed.len())
                     .map(|i| quote::format_ident!("field_{}", i))
                     .collect();
+                let field_conversions: Vec<_> = field_names.iter()
+                    .map(|name| quote! { #name.into() })
+                    .collect();
                 quote! {
-                    #source_enum::#variant_name(#(#field_names),*) => #target_enum::#variant_name(#(#field_names),*),
+                    #source_enum::#variant_name(#(#field_names),*) => #target_enum::#variant_name(#(#field_conversions),*),
                 }
             },
             Fields::Named(fields) => {
                 let field_names: Vec<_> = fields.named.iter()
                     .map(|f| &f.ident)
                     .collect();
+                let field_conversions: Vec<_> = field_names.iter()
+                    .map(|name| quote! { #name: #name.into() })
+                    .collect();
                 quote! {
-                    #source_enum::#variant_name { #(#field_names),* } => #target_enum::#variant_name { #(#field_names),* },
+                    #source_enum::#variant_name { #(#field_names),* } => #target_enum::#variant_name { #(#field_conversions),* },
                 }
             }
         };
