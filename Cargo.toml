@@ -3,6 +3,7 @@ name = "enum_convert"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
+repository = "https://github.com/avandecreme/enum_convert"
 description = "A Rust procedural macro library for deriving automatic conversions between enum variants"
 keywords = ["enum", "convert", "derive", "macro", "variant"]
 categories = ["development-tools::procedural-macro-helpers"]
