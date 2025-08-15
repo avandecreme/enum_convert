@@ -1,0 +1,7 @@
+error: proc-macro derive panicked
+ --> tests/enum_into/compile_fail/container/derive_on_struct.rs:3:10
+  |
+3 | #[derive(EnumInto)] // Should only work on enums
+  |          ^^^^^^^^
+  |
+  = help: message: EnumInto can only be derived for enums

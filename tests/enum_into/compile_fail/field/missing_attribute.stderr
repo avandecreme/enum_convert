@@ -1,0 +1,7 @@
+error[E0559]: variant `Target::Data` has no field named `x`
+ --> tests/enum_into/compile_fail/field/missing_attribute.rs:9:9
+  |
+9 |         x: i32,
+  |         ^ `Target::Data` does not have this field
+  |
+  = note: all struct fields are already assigned

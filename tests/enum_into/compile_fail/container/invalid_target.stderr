@@ -1,0 +1,11 @@
+error[E0412]: cannot find type `Target` in this scope
+ --> tests/enum_into/compile_fail/container/invalid_target.rs:4:13
+  |
+4 | #[enum_into(Target)] // There is no Target enum
+  |             ^^^^^^ not found in this scope
+
+error[E0433]: failed to resolve: use of undeclared type `Target`
+ --> tests/enum_into/compile_fail/container/invalid_target.rs:4:13
+  |
+4 | #[enum_into(Target)] // There is no Target enum
+  |             ^^^^^^ use of undeclared type `Target`

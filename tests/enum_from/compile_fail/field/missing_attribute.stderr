@@ -1,0 +1,17 @@
+error[E0026]: variant `Source::Stuff` does not have a field named `a`
+  --> tests/enum_from/compile_fail/field/missing_attribute.rs:13:9
+   |
+13 |         a: i64,
+   |         ^ variant `Source::Stuff` does not have this field
+
+error: pattern requires `..` due to inaccessible fields
+ --> tests/enum_from/compile_fail/field/missing_attribute.rs:7:10
+  |
+7 | #[derive(EnumFrom)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `EnumFrom` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: ignore the inaccessible and unused fields
+  |
+13|         a, ..: i64,
+  |          ++++

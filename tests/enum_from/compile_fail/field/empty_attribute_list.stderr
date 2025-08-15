@@ -1,0 +1,5 @@
+error: expected a list of field names, for example #[enum_from(Source1::field_a, Source2::field_b)]
+  --> tests/enum_from/compile_fail/field/empty_attribute_list.rs:14:9
+   |
+14 |         #[enum_from()] // Should be #[enum_from(Source::x)]
+   |         ^

@@ -1,0 +1,35 @@
+error[E0433]: failed to resolve: `Unit` is a variant, not a module
+ --> tests/enum_from/compile_fail/container/invalid_source_kind.rs:8:21
+  |
+8 | #[enum_from(Source::Unit)] // Should be #[enum_from(Source)]
+  |                     ^^^^ `Unit` is a variant, not a module
+  |
+help: there is an enum variant `crate::Source::Unit` and 3 others; try using the variant's enum
+  |
+8 - #[enum_from(Source::Unit)] // Should be #[enum_from(Source)]
+8 + #[enum_from(crate::Source)] // Should be #[enum_from(Source)]
+  |
+8 - #[enum_from(Source::Unit)] // Should be #[enum_from(Source)]
+8 + #[enum_from(crate::Target)] // Should be #[enum_from(Source)]
+  |
+8 - #[enum_from(Source::Unit)] // Should be #[enum_from(Source)]
+8 + #[enum_from(syn::Fields)] // Should be #[enum_from(Source)]
+  |
+
+error[E0573]: expected type, found variant `Source::Unit`
+ --> tests/enum_from/compile_fail/container/invalid_source_kind.rs:8:13
+  |
+8 | #[enum_from(Source::Unit)] // Should be #[enum_from(Source)]
+  |             ^^^^^^^^^^^^ not a type
+  |
+help: try using the variant's enum
+  |
+8 - #[enum_from(Source::Unit)] // Should be #[enum_from(Source)]
+8 + #[enum_from(crate::Source)] // Should be #[enum_from(Source)]
+  |
+8 - #[enum_from(Source::Unit)] // Should be #[enum_from(Source)]
+8 + #[enum_from(crate::Target)] // Should be #[enum_from(Source)]
+  |
+8 - #[enum_from(Source::Unit)] // Should be #[enum_from(Source)]
+8 + #[enum_from(syn::Fields)] // Should be #[enum_from(Source)]
+  |

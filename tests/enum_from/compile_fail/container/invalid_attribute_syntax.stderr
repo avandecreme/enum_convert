@@ -1,0 +1,5 @@
+error: expected `,`
+  --> tests/enum_from/compile_fail/container/invalid_attribute_syntax.rs:12:20
+   |
+12 | #[enum_from(Source1; Source2)] // Semi colon instead of comma
+   |                    ^

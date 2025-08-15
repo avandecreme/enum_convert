@@ -1,0 +1,10 @@
+error[E0412]: cannot find type `Source` in this scope
+ --> tests/enum_from/compile_fail/container/invalid_source.rs:8:13
+  |
+8 | #[enum_from(Source)] // There is no Source enum
+  |             ^^^^^^ not found in this scope
+  |
+help: consider importing this struct
+  |
+1 + use core::error::Source;
+  |

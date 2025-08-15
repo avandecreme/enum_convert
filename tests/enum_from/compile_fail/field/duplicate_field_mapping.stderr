@@ -1,0 +1,5 @@
+error: Multiple mapping found for source enum `Source`
+  --> tests/enum_from/compile_fail/field/duplicate_field_mapping.rs:14:9
+   |
+14 |         #[enum_from(Source::x, Source::y)] // Should be #[enum_from(Source::x)]
+   |         ^

@@ -1,0 +1,5 @@
+error: When multiple source enums are specified, each variant must specify from which enum to convert with #[enum_from(Enum)] or #[enum_from(Enum::Variant)]
+  --> tests/enum_from/compile_fail/variant/multiple_sources_without_specification.rs:14:5
+   |
+14 |     #[enum_from] // Ambiguous - should specify which enum when multiple sources
+   |     ^

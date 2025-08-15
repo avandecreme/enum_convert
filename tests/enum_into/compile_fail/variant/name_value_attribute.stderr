@@ -1,0 +1,6 @@
+error: expected a list of variants, for example #[enum_into(Target1::VariantA, Target2::VariantB)].
+       If there is only one target enum and the variant names are identical between source and target, #[enum_into] can be omitted.
+ --> tests/enum_into/compile_fail/variant/name_value_attribute.rs:6:5
+  |
+6 |     #[enum_into = "Target::Bar"] // Should be #[enum_into(Target::Bar)]
+  |     ^

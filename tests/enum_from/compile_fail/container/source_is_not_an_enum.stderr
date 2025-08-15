@@ -1,0 +1,14 @@
+error[E0599]: no associated item named `Field` found for struct `Source` in the current scope
+  --> tests/enum_from/compile_fail/container/source_is_not_an_enum.rs:11:5
+   |
+3  |   struct Source {
+   |   ------------- associated item `Field` not found for this struct
+...
+8  |   #[enum_from(Source)] // Source should be an enum
+   |  _____________-
+9  | | enum Target {
+10 | |     #[enum_from]
+11 | |     Field,
+   | |    -^^^^^ associated item not found in `Source`
+   | |____|
+   |

@@ -109,7 +109,7 @@ use proc_macro::TokenStream;
 /// ```
 #[proc_macro_derive(EnumFrom, attributes(enum_from))]
 pub fn derive_enum_from(input: TokenStream) -> TokenStream {
-    enum_from::derive_from_variants_impl(input)
+    enum_from::derive_enum_from_impl(input)
 }
 
 /// Derives `From<AnnotatedEnum> for Target`.
@@ -202,5 +202,5 @@ pub fn derive_enum_from(input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_derive(EnumInto, attributes(enum_into))]
 pub fn derive_enum_into(input: TokenStream) -> TokenStream {
-    enum_into::derive_into_variants_impl(input)
+    enum_into::derive_enum_into_impl(input)
 }

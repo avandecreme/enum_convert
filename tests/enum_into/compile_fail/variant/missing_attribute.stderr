@@ -1,0 +1,14 @@
+error[E0599]: no variant or associated item named `Foo` found for enum `Target` in the current scope
+  --> tests/enum_into/compile_fail/variant/missing_attribute.rs:7:5
+   |
+4  |   #[enum_into(Target)]
+   |  _____________-
+5  | | enum Source {
+6  | |     // Missing #[enum_into(Target::Bar)]
+7  | |     Foo,
+   | |    -^^^ variant or associated item not found in `Target`
+   | |____|
+   |
+...
+10 |   enum Target {
+   |   ----------- variant or associated item `Foo` not found for this enum

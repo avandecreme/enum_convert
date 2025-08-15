@@ -1,0 +1,8 @@
+error[E0599]: no variant or associated item named `NonExistent` found for enum `Source` in the current scope
+  --> tests/enum_from/compile_fail/variant/invalid_source_variant.rs:10:25
+   |
+3  | enum Source {
+   | ----------- variant or associated item `NonExistent` not found for this enum
+...
+10 |     #[enum_from(Source::NonExistent)] // Invalid variant name
+   |                         ^^^^^^^^^^^ variant or associated item not found in `Source`
