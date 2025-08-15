@@ -1,0 +1,7 @@
+error: proc-macro derive panicked
+  --> tests/compile_fail/multiple_sources_without_specification.rs:11:10
+   |
+11 | #[derive(EnumFrom)]
+   |          ^^^^^^^^
+   |
+   = help: message: When multiple source enums are specified, each variant must specify which enum with #[enum_from(Enum)] or #[enum_from(Enum::Variant)]

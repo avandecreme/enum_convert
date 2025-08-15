@@ -16,7 +16,7 @@ pub fn derive_from_variants_impl(input: TokenStream) -> TokenStream {
     // Only work with enums
     let data = match &input.data {
         Data::Enum(data) => data,
-        _ => panic!("FromVariants can only be derived for enums"),
+        _ => panic!("EnumFrom can only be derived for enums"),
     };
 
     // Generate match arms only for variants marked with #[enum_from]
@@ -104,37 +104,37 @@ pub fn derive_from_variants_impl(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-struct ContainerFromVariantsArgs {
+struct ContainerEnumFromArgs {
     enums: Punctuated<Path, Token![,]>,
 }
 
-impl Parse for ContainerFromVariantsArgs {
+impl Parse for ContainerEnumFromArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(ContainerFromVariantsArgs {
+        Ok(ContainerEnumFromArgs {
             enums: Punctuated::parse_terminated(input)?,
         })
     }
 }
 
-struct VariantFromVariantsArgs {
+struct VariantEnumFromArgs {
     sources: Punctuated<VariantSource, Token![,]>,
 }
 
-impl Parse for VariantFromVariantsArgs {
+impl Parse for VariantEnumFromArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(VariantFromVariantsArgs {
+        Ok(VariantEnumFromArgs {
             sources: Punctuated::parse_terminated(input)?,
         })
     }
 }
 
-struct FieldFromVariantsArgs {
+struct FieldEnumFromArgs {
     fields: Punctuated<FieldSource, Token![,]>,
 }
 
-impl Parse for FieldFromVariantsArgs {
+impl Parse for FieldEnumFromArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(FieldFromVariantsArgs {
+        Ok(FieldEnumFromArgs {
             fields: Punctuated::parse_terminated(input)?,
         })
     }
@@ -190,7 +190,7 @@ fn extract_source_enums(attrs: &[Attribute]) -> Option<Vec<Path>> {
     for attr in attrs {
         if attr.path().is_ident("enum_from")
             && let Meta::List(meta_list) = &attr.meta
-            && let Ok(args) = meta_list.parse_args::<ContainerFromVariantsArgs>()
+            && let Ok(args) = meta_list.parse_args::<ContainerEnumFromArgs>()
         {
             return Some(args.enums.into_iter().collect());
         }
@@ -211,19 +211,25 @@ fn extract_enum_from_sources(attrs: &[Attribute], target_variant: &Ident) -> Vec
                     return Vec::new();
                 }
                 Meta::List(meta_list) => {
-                    if let Ok(args) = meta_list.parse_args::<VariantFromVariantsArgs>() {
-                        return args
-                            .sources
-                            .into_iter()
-                            .map(|source| match source {
-                                VariantSource::EnumOnly(enum_name) => {
-                                    (enum_name, target_variant.clone())
-                                }
-                                VariantSource::EnumVariant(enum_name, variant_name) => {
-                                    (enum_name, variant_name)
-                                }
-                            })
-                            .collect();
+                    match meta_list.parse_args::<VariantEnumFromArgs>() {
+                        Ok(args) => {
+                            return args
+                                .sources
+                                .into_iter()
+                                .map(|source| match source {
+                                    VariantSource::EnumOnly(enum_name) => {
+                                        (enum_name, target_variant.clone())
+                                    }
+                                    VariantSource::EnumVariant(enum_name, variant_name) => {
+                                        (enum_name, variant_name)
+                                    }
+                                })
+                                .collect();
+                        }
+                        Err(_) => {
+                            // Parsing failed - this should cause a compile error
+                            panic!("Invalid enum_from attribute syntax");
+                        }
                     }
                 }
                 _ => continue,
@@ -237,7 +243,7 @@ fn extract_field_mapping(field: &Field, source_enum: &Path) -> Option<Ident> {
     for attr in &field.attrs {
         if attr.path().is_ident("enum_from")
             && let Meta::List(meta_list) = &attr.meta
-            && let Ok(args) = meta_list.parse_args::<FieldFromVariantsArgs>()
+            && let Ok(args) = meta_list.parse_args::<FieldEnumFromArgs>()
         {
             // Find the field mapping for this source enum
             for FieldSource::EnumField(enum_name, field_name) in args.fields {

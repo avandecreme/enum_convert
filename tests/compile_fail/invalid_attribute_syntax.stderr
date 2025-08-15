@@ -1,0 +1,7 @@
+error: proc-macro derive panicked
+ --> tests/compile_fail/invalid_attribute_syntax.rs:7:10
+  |
+7 | #[derive(EnumFrom)]
+  |          ^^^^^^^^
+  |
+  = help: message: Invalid enum_from attribute syntax

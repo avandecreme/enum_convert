@@ -1,0 +1,7 @@
+error: proc-macro derive panicked
+ --> tests/compile_fail/missing_enum_from_attribute.rs:7:10
+  |
+7 | #[derive(EnumFrom)]
+  |          ^^^^^^^^
+  |
+  = help: message: enum_from attribute with source enum names is required
