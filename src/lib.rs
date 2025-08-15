@@ -1,6 +1,9 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta, Path, Ident, punctuated::Punctuated, Token, parse::Parse, parse::ParseStream};
+use syn::{
+    Attribute, Data, DeriveInput, Field, Fields, Ident, Meta, Path, Token, parse::Parse,
+    parse::ParseStream, parse_macro_input, punctuated::Punctuated,
+};
 
 /// Derives `From<T>` for the annotated enum where T is a smaller enum with a subset of variants.
 ///
@@ -48,11 +51,16 @@ use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta, Path, I
 /// enum First {
 ///     Unit,
 ///     Tuple(i32, &'static str),
+///     DifferentName {
+///         alpha: f64,
+///         y: f64,
+///         s: &'static str,
+///     },
 /// }
 ///
 /// enum Second {
 ///     Empty,
-///     Struct { x: i32, y: i32 },
+///     Struct { a: i32, b: i32, s: &'static str },
 /// }
 ///
 /// #[derive(FromVariants)]
@@ -62,8 +70,14 @@ use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta, Path, I
 ///     Unit,
 ///     #[from_variants(First)]
 ///     Tuple(i64, String),
-///     #[from_variants(Second)]
-///     Struct { x: f64, y: f64 },
+///     #[from_variants(First::DifferentName, Second)]
+///     Struct {
+///         #[from_variants(First::alpha, Second::a)]
+///         x: f64,
+///         #[from_variants(Second::b)]
+///         y: f64,
+///         s: &'static str,
+///     },
 ///     Extra
 /// }
 ///
@@ -80,9 +94,14 @@ use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta, Path, I
 /// let bigger: Bigger = first.into();
 /// assert!(matches!(bigger, Bigger::Tuple(42, ref s) if s == "hello"));
 ///
-/// let second = Second::Struct { x: 1, y: 2 };
+/// let first = First::DifferentName { alpha: 1.0, y: 2.0, s: "hello" };
+/// let bigger: Bigger = first.into();
+/// assert!(matches!(bigger, Bigger::Struct { x, y, s } if x == 1.0 && y == 2.0 && s == "hello"));
+///
+/// // Struct can also come from Second
+/// let second = Second::Struct { a: 1, b: 2, s: "hello" };
 /// let bigger: Bigger = second.into();
-/// assert!(matches!(bigger, Bigger::Struct { x, y } if x == 1.0 && y == 2.0));
+/// assert!(matches!(bigger, Bigger::Struct { x, y, s } if x == 1.0 && y == 2.0 && s == "hello"));
 /// ```
 #[proc_macro_derive(FromVariants, attributes(from_variants))]
 pub fn derive_from_variants(input: TokenStream) -> TokenStream {
@@ -137,14 +156,13 @@ pub fn derive_from_variants(input: TokenStream) -> TokenStream {
                     }
                 },
                 Fields::Named(fields) => {
-                    let field_names: Vec<_> = fields.named.iter()
-                        .map(|f| &f.ident)
-                        .collect();
-                    let field_conversions: Vec<_> = field_names.iter()
-                        .map(|name| quote! { #name: #name.into() })
-                        .collect();
+                    let (source_patterns, target_assignments) = generate_field_mappings(
+                        fields,
+                        &source_enum_name,
+                        &source_variant_name
+                    );
                     quote! {
-                        #source_enum_name::#source_variant_name { #(#field_names),* } => #target_enum::#target_variant_name { #(#field_conversions),* },
+                        #source_enum_name::#source_variant_name { #(#source_patterns),* } => #target_enum::#target_variant_name { #(#target_assignments),* },
                     }
                 }
             };
@@ -153,7 +171,8 @@ pub fn derive_from_variants(input: TokenStream) -> TokenStream {
     }).collect();
 
     // Group match arms by source enum
-    let mut arms_by_enum: std::collections::HashMap<String, Vec<_>> = std::collections::HashMap::new();
+    let mut arms_by_enum: std::collections::HashMap<String, Vec<_>> =
+        std::collections::HashMap::new();
 
     for (source_enum_name, _source_variant_name, _target_variant_name, arm) in &match_arms {
         let enum_key = quote!(#source_enum_name).to_string();
@@ -208,6 +227,38 @@ impl Parse for VariantFromVariantsArgs {
     }
 }
 
+struct FieldFromVariantsArgs {
+    fields: Punctuated<FieldSource, Token![,]>,
+}
+
+impl Parse for FieldFromVariantsArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(FieldFromVariantsArgs {
+            fields: Punctuated::parse_terminated(input)?,
+        })
+    }
+}
+
+enum FieldSource {
+    EnumField(Path, Ident),
+}
+
+impl Parse for FieldSource {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let path: Path = input.parse()?;
+        if path.segments.len() == 2 {
+            let enum_name = Path {
+                leading_colon: None,
+                segments: path.segments.iter().take(1).cloned().collect(),
+            };
+            let field_name = path.segments.last().unwrap().ident.clone();
+            Ok(FieldSource::EnumField(enum_name, field_name))
+        } else {
+            Err(syn::Error::new_spanned(path, "Expected Enum::field_name"))
+        }
+    }
+}
+
 enum VariantSource {
     EnumOnly(Path),
     EnumVariant(Path, Ident),
@@ -226,7 +277,10 @@ impl Parse for VariantSource {
             let variant_name = path.segments.last().unwrap().ident.clone();
             Ok(VariantSource::EnumVariant(enum_name, variant_name))
         } else {
-            Err(syn::Error::new_spanned(path, "Expected Enum or Enum::Variant"))
+            Err(syn::Error::new_spanned(
+                path,
+                "Expected Enum or Enum::Variant",
+            ))
         }
     }
 }
@@ -245,30 +299,85 @@ fn extract_source_enums(attrs: &[Attribute]) -> Option<Vec<Path>> {
 }
 
 fn has_from_variants_attr(attrs: &[Attribute]) -> bool {
-    attrs.iter().any(|attr| attr.path().is_ident("from_variants"))
+    attrs
+        .iter()
+        .any(|attr| attr.path().is_ident("from_variants"))
 }
 
-fn extract_from_variants_sources(attrs: &[Attribute], target_variant: &Ident) -> Vec<(Path, Ident)> {
+fn extract_from_variants_sources(
+    attrs: &[Attribute],
+    target_variant: &Ident,
+) -> Vec<(Path, Ident)> {
     for attr in attrs {
         if attr.path().is_ident("from_variants") {
             match &attr.meta {
                 Meta::Path(_) => {
                     // #[from_variants] without arguments - return empty to use default fallback
                     return Vec::new();
-                },
+                }
                 Meta::List(meta_list) => {
                     if let Ok(args) = meta_list.parse_args::<VariantFromVariantsArgs>() {
-                        return args.sources.into_iter().map(|source| {
-                            match source {
-                                VariantSource::EnumOnly(enum_name) => (enum_name, target_variant.clone()),
-                                VariantSource::EnumVariant(enum_name, variant_name) => (enum_name, variant_name),
-                            }
-                        }).collect();
+                        return args
+                            .sources
+                            .into_iter()
+                            .map(|source| match source {
+                                VariantSource::EnumOnly(enum_name) => {
+                                    (enum_name, target_variant.clone())
+                                }
+                                VariantSource::EnumVariant(enum_name, variant_name) => {
+                                    (enum_name, variant_name)
+                                }
+                            })
+                            .collect();
                     }
-                },
+                }
                 _ => continue,
             }
         }
     }
     Vec::new()
+}
+
+fn extract_field_mapping(field: &Field, source_enum: &Path) -> Option<Ident> {
+    for attr in &field.attrs {
+        if attr.path().is_ident("from_variants") {
+            if let Meta::List(meta_list) = &attr.meta {
+                if let Ok(args) = meta_list.parse_args::<FieldFromVariantsArgs>() {
+                    // Find the field mapping for this source enum
+                    for FieldSource::EnumField(enum_name, field_name) in args.fields {
+                        if quote!(#enum_name).to_string() == quote!(#source_enum).to_string() {
+                            return Some(field_name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+fn generate_field_mappings(
+    fields: &syn::FieldsNamed,
+    source_enum: &Path,
+    _source_variant: &Ident,
+) -> (Vec<proc_macro2::TokenStream>, Vec<proc_macro2::TokenStream>) {
+    let mut source_patterns = Vec::new();
+    let mut target_assignments = Vec::new();
+
+    for field in &fields.named {
+        let target_field_name = field.ident.as_ref().unwrap();
+
+        // Check if there's a field mapping for this source enum
+        if let Some(source_field_name) = extract_field_mapping(field, source_enum) {
+            // Use mapped field name from source
+            source_patterns.push(quote! { #source_field_name });
+            target_assignments.push(quote! { #target_field_name: #source_field_name.into() });
+        } else {
+            // Use same field name in both source and target
+            source_patterns.push(quote! { #target_field_name });
+            target_assignments.push(quote! { #target_field_name: #target_field_name.into() });
+        }
+    }
+
+    (source_patterns, target_assignments)
 }
