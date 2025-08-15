@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Nix
+      uses: DeterminateSystems/nix-installer-action@428f3c64a3f56011a8bfb3044a519374aff8e7df
+
+    - name: Enable flakes cache
+      uses: DeterminateSystems/magic-nix-cache-action@7f4e021881570cb0d5524c444d798697dede5a87
+
+    - name: Run tests
+      run: nix develop --command cargo test
+
+    - name: Check formatting
+      run: nix develop --command cargo fmt -- --check
+
+    - name: Run clippy
+      run: nix develop --command cargo clippy -- -D warnings

@@ -188,27 +188,21 @@ impl Parse for VariantSource {
 
 fn extract_source_enums(attrs: &[Attribute]) -> Option<Vec<Path>> {
     for attr in attrs {
-        if attr.path().is_ident("enum_from") {
-            if let Meta::List(meta_list) = &attr.meta {
-                if let Ok(args) = meta_list.parse_args::<ContainerFromVariantsArgs>() {
-                    return Some(args.enums.into_iter().collect());
-                }
-            }
+        if attr.path().is_ident("enum_from")
+            && let Meta::List(meta_list) = &attr.meta
+            && let Ok(args) = meta_list.parse_args::<ContainerFromVariantsArgs>()
+        {
+            return Some(args.enums.into_iter().collect());
         }
     }
     None
 }
 
 fn has_enum_from_attr(attrs: &[Attribute]) -> bool {
-    attrs
-        .iter()
-        .any(|attr| attr.path().is_ident("enum_from"))
+    attrs.iter().any(|attr| attr.path().is_ident("enum_from"))
 }
 
-fn extract_enum_from_sources(
-    attrs: &[Attribute],
-    target_variant: &Ident,
-) -> Vec<(Path, Ident)> {
+fn extract_enum_from_sources(attrs: &[Attribute], target_variant: &Ident) -> Vec<(Path, Ident)> {
     for attr in attrs {
         if attr.path().is_ident("enum_from") {
             match &attr.meta {
@@ -241,15 +235,14 @@ fn extract_enum_from_sources(
 
 fn extract_field_mapping(field: &Field, source_enum: &Path) -> Option<Ident> {
     for attr in &field.attrs {
-        if attr.path().is_ident("enum_from") {
-            if let Meta::List(meta_list) = &attr.meta {
-                if let Ok(args) = meta_list.parse_args::<FieldFromVariantsArgs>() {
-                    // Find the field mapping for this source enum
-                    for FieldSource::EnumField(enum_name, field_name) in args.fields {
-                        if quote!(#enum_name).to_string() == quote!(#source_enum).to_string() {
-                            return Some(field_name);
-                        }
-                    }
+        if attr.path().is_ident("enum_from")
+            && let Meta::List(meta_list) = &attr.meta
+            && let Ok(args) = meta_list.parse_args::<FieldFromVariantsArgs>()
+        {
+            // Find the field mapping for this source enum
+            for FieldSource::EnumField(enum_name, field_name) in args.fields {
+                if quote!(#enum_name).to_string() == quote!(#source_enum).to_string() {
+                    return Some(field_name);
                 }
             }
         }
