@@ -10,33 +10,34 @@ use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta, Path};
 /// use from_variants::FromVariants;
 ///
 /// enum Smaller {
-///     Variant1,
-///     Variant3
+///     Unit,
+///     Tuple(i32, String),
+///     Struct { x: f64, y: f64 }
 /// }
 ///
 /// #[derive(FromVariants)]
 /// #[from_variants(Smaller)]
 /// enum Bigger {
 ///     #[from_variant]
-///     Variant1,
-///     Variant2,
+///     Unit,
 ///     #[from_variant]
-///     Variant3
+///     Tuple(i32, String),
+///     #[from_variant]
+///     Struct { x: f64, y: f64 },
+///     Extra
 /// }
 ///
-/// // This generates:
-/// // impl From<Smaller> for Bigger {
-/// //     fn from(value: Smaller) -> Self {
-/// //         match value {
-/// //             Smaller::Variant1 => Bigger::Variant1,
-/// //             Smaller::Variant3 => Bigger::Variant3,
-/// //         }
-/// //     }
-/// // }
-///
-/// let smaller = Smaller::Variant1;
+/// let smaller = Smaller::Unit;
 /// let bigger: Bigger = smaller.into();
-/// assert!(matches!(bigger, Bigger::Variant1));
+/// assert!(matches!(bigger, Bigger::Unit));
+///
+/// let smaller = Smaller::Tuple(42, "hello".to_string());
+/// let bigger: Bigger = smaller.into();
+/// assert!(matches!(bigger, Bigger::Tuple(42, ref s) if s == "hello"));
+///
+/// let smaller = Smaller::Struct { x: 1.0, y: 2.0 };
+/// let bigger: Bigger = smaller.into();
+/// assert!(matches!(bigger, Bigger::Struct { x, y } if x == 1.0 && y == 2.0));
 /// ```
 #[proc_macro_derive(FromVariants, attributes(from_variants, from_variant))]
 pub fn derive_from_variants(input: TokenStream) -> TokenStream {
