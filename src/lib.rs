@@ -1,17 +1,116 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput};
+use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Meta, Path};
 
-#[proc_macro_derive(FromVariants)]
+/// Derives `From<T>` for the annotated enum where T is a smaller enum with a subset of variants.
+///
+/// # Examples
+///
+/// ```
+/// use from_variants::FromVariants;
+///
+/// enum Smaller {
+///     Variant1,
+///     Variant3
+/// }
+///
+/// #[derive(FromVariants)]
+/// #[from_variants(Smaller)]
+/// enum Bigger {
+///     #[from_variant]
+///     Variant1,
+///     Variant2,
+///     #[from_variant]
+///     Variant3
+/// }
+///
+/// // This generates:
+/// // impl From<Smaller> for Bigger {
+/// //     fn from(value: Smaller) -> Self {
+/// //         match value {
+/// //             Smaller::Variant1 => Bigger::Variant1,
+/// //             Smaller::Variant3 => Bigger::Variant3,
+/// //         }
+/// //     }
+/// // }
+///
+/// let smaller = Smaller::Variant1;
+/// let bigger: Bigger = smaller.into();
+/// assert!(matches!(bigger, Bigger::Variant1));
+/// ```
+#[proc_macro_derive(FromVariants, attributes(from_variants, from_variant))]
 pub fn derive_from_variants(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
-    
+    let target_enum = &input.ident;
+
+    // Extract the source enum name from the attribute
+    let source_enum = extract_source_enum(&input.attrs)
+        .expect("from_variants attribute with source enum name is required");
+
+    // Only work with enums
+    let data = match &input.data {
+        Data::Enum(data) => data,
+        _ => panic!("FromVariants can only be derived for enums"),
+    };
+
+    // Generate match arms only for variants marked with #[from_variant]
+    let match_arms = data.variants.iter().filter_map(|variant| {
+        // Check if this variant has the #[from_variant] attribute
+        let has_from_variant = variant.attrs.iter().any(|attr| {
+            attr.path().is_ident("from_variant")
+        });
+        
+        if !has_from_variant {
+            return None;
+        }
+        
+        let variant_name = &variant.ident;
+        let arm = match &variant.fields {
+            Fields::Unit => quote! {
+                #source_enum::#variant_name => #target_enum::#variant_name,
+            },
+            Fields::Unnamed(fields) => {
+                let field_names: Vec<_> = (0..fields.unnamed.len())
+                    .map(|i| quote::format_ident!("field_{}", i))
+                    .collect();
+                quote! {
+                    #source_enum::#variant_name(#(#field_names),*) => #target_enum::#variant_name(#(#field_names),*),
+                }
+            },
+            Fields::Named(fields) => {
+                let field_names: Vec<_> = fields.named.iter()
+                    .map(|f| &f.ident)
+                    .collect();
+                quote! {
+                    #source_enum::#variant_name { #(#field_names),* } => #target_enum::#variant_name { #(#field_names),* },
+                }
+            }
+        };
+        Some(arm)
+    });
+
     let expanded = quote! {
-        impl #name {
-            // Placeholder implementation
+        impl From<#source_enum> for #target_enum {
+            fn from(value: #source_enum) -> Self {
+                match value {
+                    #(#match_arms)*
+                }
+            }
         }
     };
-    
+
     TokenStream::from(expanded)
+}
+
+fn extract_source_enum(attrs: &[Attribute]) -> Option<Path> {
+    for attr in attrs {
+        if attr.path().is_ident("from_variants") {
+            if let Meta::List(meta_list) = &attr.meta {
+                if let Ok(path) = meta_list.parse_args::<Path>() {
+                    return Some(path);
+                }
+            }
+        }
+    }
+    None
 }
