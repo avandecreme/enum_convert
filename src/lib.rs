@@ -3,7 +3,7 @@ mod enum_into;
 
 use proc_macro::TokenStream;
 
-/// Derives `From<Source>` for the annotated Target enum where the source enums have a subset of variants.
+/// Derives `From<Source> for AnnotatedEnum`.
 ///
 /// # Examples
 ///
@@ -112,7 +112,7 @@ pub fn derive_enum_from(input: TokenStream) -> TokenStream {
     enum_from::derive_from_variants_impl(input)
 }
 
-/// Derives `From<Source>` for the annotated enum where the target enums have a subset of variants.
+/// Derives `From<AnnotatedEnum> for Target`.
 ///
 /// # Examples
 ///
