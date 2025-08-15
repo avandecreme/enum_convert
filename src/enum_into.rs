@@ -11,7 +11,7 @@ pub fn derive_into_variants_impl(input: TokenStream) -> TokenStream {
 
     // Extract the target enum names from the attribute
     let target_enums = extract_target_enums(&input.attrs)
-        .expect("into_variants attribute with target enum names is required");
+        .expect("enum_into attribute with target enum names is required");
 
     // Only work with enums
     let data = match &input.data {
@@ -19,10 +19,10 @@ pub fn derive_into_variants_impl(input: TokenStream) -> TokenStream {
         _ => panic!("IntoVariants can only be derived for enums"),
     };
 
-    // Generate match arms for all variants (into_variants attribute is optional)
+    // Generate match arms for all variants (enum_into attribute is optional)
     let match_arms: Vec<_> = data.variants.iter().flat_map(|variant| {
 
-        let variant_targets = extract_into_variants_targets(&variant.attrs, &variant.ident);
+        let variant_targets = extract_enum_into_targets(&variant.attrs, &variant.ident);
         let targets = if variant_targets.is_empty() {
             // Default behavior: map to all target enums with same variant name
             target_enums.iter().map(|enum_name| (enum_name.clone(), variant.ident.clone())).collect()
@@ -181,7 +181,7 @@ impl Parse for VariantTarget {
 
 fn extract_target_enums(attrs: &[Attribute]) -> Option<Vec<Path>> {
     for attr in attrs {
-        if attr.path().is_ident("into_variants") {
+        if attr.path().is_ident("enum_into") {
             if let Meta::List(meta_list) = &attr.meta {
                 if let Ok(args) = meta_list.parse_args::<ContainerIntoVariantsArgs>() {
                     return Some(args.enums.into_iter().collect());
@@ -193,15 +193,15 @@ fn extract_target_enums(attrs: &[Attribute]) -> Option<Vec<Path>> {
 }
 
 
-fn extract_into_variants_targets(
+fn extract_enum_into_targets(
     attrs: &[Attribute],
     source_variant: &Ident,
 ) -> Vec<(Path, Ident)> {
     for attr in attrs {
-        if attr.path().is_ident("into_variants") {
+        if attr.path().is_ident("enum_into") {
             match &attr.meta {
                 Meta::Path(_) => {
-                    // #[into_variants] without arguments - return empty to use default fallback
+                    // #[enum_into] without arguments - return empty to use default fallback
                     return Vec::new();
                 }
                 Meta::List(meta_list) => {
@@ -229,7 +229,7 @@ fn extract_into_variants_targets(
 
 fn extract_field_mapping(field: &Field, target_enum: &Path) -> Option<Ident> {
     for attr in &field.attrs {
-        if attr.path().is_ident("into_variants") {
+        if attr.path().is_ident("enum_into") {
             if let Meta::List(meta_list) = &attr.meta {
                 if let Ok(args) = meta_list.parse_args::<FieldIntoVariantsArgs>() {
                     // Find the field mapping for this target enum

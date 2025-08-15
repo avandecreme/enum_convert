@@ -11,7 +11,7 @@ pub fn derive_from_variants_impl(input: TokenStream) -> TokenStream {
 
     // Extract the source enum names from the attribute
     let source_enums = extract_source_enums(&input.attrs)
-        .expect("from_variants attribute with source enum names is required");
+        .expect("enum_from attribute with source enum names is required");
 
     // Only work with enums
     let data = match &input.data {
@@ -19,20 +19,20 @@ pub fn derive_from_variants_impl(input: TokenStream) -> TokenStream {
         _ => panic!("FromVariants can only be derived for enums"),
     };
 
-    // Generate match arms only for variants marked with #[from_variants]
+    // Generate match arms only for variants marked with #[enum_from]
     let match_arms: Vec<_> = data.variants.iter().flat_map(|variant| {
-        // Check if this variant has the #[from_variants] attribute
-        if !has_from_variants_attr(&variant.attrs) {
+        // Check if this variant has the #[enum_from] attribute
+        if !has_enum_from_attr(&variant.attrs) {
             return Vec::new();
         }
 
-        let variant_sources = extract_from_variants_sources(&variant.attrs, &variant.ident);
+        let variant_sources = extract_enum_from_sources(&variant.attrs, &variant.ident);
         let sources = if variant_sources.is_empty() {
             // Fallback to default behavior
             if source_enums.len() == 1 {
                 vec![(source_enums[0].clone(), variant.ident.clone())]
             } else {
-                panic!("When multiple source enums are specified, each variant must specify which enum with #[from_variants(Enum)] or #[from_variants(Enum::Variant)]")
+                panic!("When multiple source enums are specified, each variant must specify which enum with #[enum_from(Enum)] or #[enum_from(Enum::Variant)]")
             }
         } else {
             variant_sources
@@ -188,7 +188,7 @@ impl Parse for VariantSource {
 
 fn extract_source_enums(attrs: &[Attribute]) -> Option<Vec<Path>> {
     for attr in attrs {
-        if attr.path().is_ident("from_variants") {
+        if attr.path().is_ident("enum_from") {
             if let Meta::List(meta_list) = &attr.meta {
                 if let Ok(args) = meta_list.parse_args::<ContainerFromVariantsArgs>() {
                     return Some(args.enums.into_iter().collect());
@@ -199,21 +199,21 @@ fn extract_source_enums(attrs: &[Attribute]) -> Option<Vec<Path>> {
     None
 }
 
-fn has_from_variants_attr(attrs: &[Attribute]) -> bool {
+fn has_enum_from_attr(attrs: &[Attribute]) -> bool {
     attrs
         .iter()
-        .any(|attr| attr.path().is_ident("from_variants"))
+        .any(|attr| attr.path().is_ident("enum_from"))
 }
 
-fn extract_from_variants_sources(
+fn extract_enum_from_sources(
     attrs: &[Attribute],
     target_variant: &Ident,
 ) -> Vec<(Path, Ident)> {
     for attr in attrs {
-        if attr.path().is_ident("from_variants") {
+        if attr.path().is_ident("enum_from") {
             match &attr.meta {
                 Meta::Path(_) => {
-                    // #[from_variants] without arguments - return empty to use default fallback
+                    // #[enum_from] without arguments - return empty to use default fallback
                     return Vec::new();
                 }
                 Meta::List(meta_list) => {
@@ -241,7 +241,7 @@ fn extract_from_variants_sources(
 
 fn extract_field_mapping(field: &Field, source_enum: &Path) -> Option<Ident> {
     for attr in &field.attrs {
-        if attr.path().is_ident("from_variants") {
+        if attr.path().is_ident("enum_from") {
             if let Meta::List(meta_list) = &attr.meta {
                 if let Ok(args) = meta_list.parse_args::<FieldFromVariantsArgs>() {
                     // Find the field mapping for this source enum

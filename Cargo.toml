@@ -1,5 +1,5 @@
 [package]
-name = "from_variants"
+name = "enum_convert"
 version = "0.1.0"
 edition = "2024"
 

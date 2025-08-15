@@ -1,5 +1,5 @@
-mod from_variants;
-mod into_variants;
+mod enum_from;
+mod enum_into;
 
 use proc_macro::TokenStream;
 
@@ -9,7 +9,7 @@ use proc_macro::TokenStream;
 ///
 /// ## Single source enum
 /// ```
-/// use from_variants::FromVariants;
+/// use enum_convert::EnumFrom;
 ///
 /// enum Source {
 ///     Unit,
@@ -18,14 +18,14 @@ use proc_macro::TokenStream;
 ///     DifferentName { x: i32, y: i32 }
 /// }
 ///
-/// #[derive(FromVariants)]
-/// #[from_variants(Source)]
+/// #[derive(EnumFrom)]
+/// #[enum_from(Source)]
 /// enum Target {
-///     #[from_variants(Source::Unit, Source::OtherUnit)]
+///     #[enum_from(Source::Unit, Source::OtherUnit)]
 ///     Unit,
-///     #[from_variants] // If there is only one mapping and it has the same name, there is no need to specify the variant
+///     #[enum_from] // If there is only one mapping and it has the same name, there is no need to specify the variant
 ///     Tuple(i64, String),
-///     #[from_variants(Source::DifferentName)]
+///     #[enum_from(Source::DifferentName)]
 ///     Struct { x: f64, y: f64 },
 ///     Extra // This variant cannot be built from Source
 /// }
@@ -50,7 +50,7 @@ use proc_macro::TokenStream;
 ///
 /// ## Multiple source enums
 /// ```
-/// use from_variants::FromVariants;
+/// use enum_convert::EnumFrom;
 ///
 /// enum FirstSource {
 ///     Unit,
@@ -67,18 +67,18 @@ use proc_macro::TokenStream;
 ///     Struct { a: i32, b: i32, s: &'static str },
 /// }
 ///
-/// #[derive(FromVariants)]
-/// #[from_variants(FirstSource, SecondSource)]
+/// #[derive(EnumFrom)]
+/// #[enum_from(FirstSource, SecondSource)]
 /// enum Target {
-///     #[from_variants(FirstSource, SecondSource::Empty)]
+///     #[enum_from(FirstSource, SecondSource::Empty)]
 ///     Unit,
-///     #[from_variants(FirstSource)]
+///     #[enum_from(FirstSource)]
 ///     Tuple(i64, String),
-///     #[from_variants(FirstSource::DifferentName, SecondSource)]
+///     #[enum_from(FirstSource::DifferentName, SecondSource)]
 ///     Struct {
-///         #[from_variants(FirstSource::alpha, SecondSource::a)]
+///         #[enum_from(FirstSource::alpha, SecondSource::a)]
 ///         x: f64,
-///         #[from_variants(SecondSource::b)]
+///         #[enum_from(SecondSource::b)]
 ///         y: f64,
 ///         s: &'static str,
 ///     },
@@ -107,9 +107,9 @@ use proc_macro::TokenStream;
 /// let target: Target = second_source.into();
 /// assert!(matches!(target, Target::Struct { x, y, s } if x == 1.0 && y == 2.0 && s == "hello"));
 /// ```
-#[proc_macro_derive(FromVariants, attributes(from_variants))]
-pub fn derive_from_variants(input: TokenStream) -> TokenStream {
-    from_variants::derive_from_variants_impl(input)
+#[proc_macro_derive(EnumFrom, attributes(enum_from))]
+pub fn derive_enum_from(input: TokenStream) -> TokenStream {
+    enum_from::derive_from_variants_impl(input)
 }
 
 /// Derives `From<Source>` for the annotated enum where the target enums have a subset of variants.
@@ -118,16 +118,16 @@ pub fn derive_from_variants(input: TokenStream) -> TokenStream {
 ///
 /// ## Single target enum
 /// ```
-/// use from_variants::IntoVariants;
+/// use enum_convert::EnumInto;
 ///
-/// #[derive(IntoVariants)]
-/// #[into_variants(Target)]
+/// #[derive(EnumInto)]
+/// #[enum_into(Target)]
 /// enum Source {
 ///     Unit,  // Uses same name in target
-///     #[into_variants(Target::Unit)]
+///     #[enum_into(Target::Unit)]
 ///     OtherUnit,
 ///     Tuple(i32, &'static str),  // Uses same name in target
-///     #[into_variants(Target::Struct)]  // Maps to different variant name
+///     #[enum_into(Target::Struct)]  // Maps to different variant name
 ///     DifferentName { x: i32, y: i32 }
 /// }
 ///
@@ -158,15 +158,15 @@ pub fn derive_from_variants(input: TokenStream) -> TokenStream {
 ///
 /// ## Multiple target enums with field mapping
 /// ```
-/// use from_variants::IntoVariants;
+/// use enum_convert::EnumInto;
 ///
-/// #[derive(IntoVariants)]
-/// #[into_variants(FirstTarget, SecondTarget)]
+/// #[derive(EnumInto)]
+/// #[enum_into(FirstTarget, SecondTarget)]
 /// enum Source {
 ///     Unit,  // Goes to both FirstTarget::Unit and SecondTarget::Unit
-///     #[into_variants(FirstTarget::Data, SecondTarget::Info)]  // Maps to different variants
+///     #[enum_into(FirstTarget::Data, SecondTarget::Info)]  // Maps to different variants
 ///     Record {
-///         #[into_variants(FirstTarget::name, SecondTarget::title)]  // Maps fields differently
+///         #[enum_into(FirstTarget::name, SecondTarget::title)]  // Maps fields differently
 ///         label: String,
 ///         value: i32
 ///     }
@@ -200,7 +200,7 @@ pub fn derive_from_variants(input: TokenStream) -> TokenStream {
 /// let second_target: SecondTarget = source.into();
 /// assert!(matches!(second_target, SecondTarget::Info { title, value } if title == "test" && value == 42));
 /// ```
-#[proc_macro_derive(IntoVariants, attributes(into_variants))]
-pub fn derive_into_variants(input: TokenStream) -> TokenStream {
-    into_variants::derive_into_variants_impl(input)
+#[proc_macro_derive(EnumInto, attributes(enum_into))]
+pub fn derive_enum_into(input: TokenStream) -> TokenStream {
+    enum_into::derive_into_variants_impl(input)
 }
