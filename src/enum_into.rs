@@ -200,19 +200,25 @@ fn extract_enum_into_targets(attrs: &[Attribute], source_variant: &Ident) -> Vec
                     return Vec::new();
                 }
                 Meta::List(meta_list) => {
-                    if let Ok(args) = meta_list.parse_args::<VariantIntoVariantsArgs>() {
-                        return args
-                            .targets
-                            .into_iter()
-                            .map(|target| match target {
-                                VariantTarget::EnumOnly(enum_name) => {
-                                    (enum_name, source_variant.clone())
-                                }
-                                VariantTarget::EnumVariant(enum_name, variant_name) => {
-                                    (enum_name, variant_name)
-                                }
-                            })
-                            .collect();
+                    match meta_list.parse_args::<VariantIntoVariantsArgs>() {
+                        Ok(args) => {
+                            return args
+                                .targets
+                                .into_iter()
+                                .map(|target| match target {
+                                    VariantTarget::EnumOnly(enum_name) => {
+                                        (enum_name, source_variant.clone())
+                                    }
+                                    VariantTarget::EnumVariant(enum_name, variant_name) => {
+                                        (enum_name, variant_name)
+                                    }
+                                })
+                                .collect();
+                        }
+                        Err(_) => {
+                            // Parsing failed - this should cause a compile error
+                            panic!("Invalid enum_into attribute syntax");
+                        }
                     }
                 }
                 _ => continue,

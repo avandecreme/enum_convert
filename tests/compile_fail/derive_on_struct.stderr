@@ -1,0 +1,7 @@
+error: proc-macro derive panicked
+ --> tests/compile_fail/derive_on_struct.rs:3:10
+  |
+3 | #[derive(EnumFrom)]
+  |          ^^^^^^^^
+  |
+  = help: message: EnumFrom can only be derived for enums
