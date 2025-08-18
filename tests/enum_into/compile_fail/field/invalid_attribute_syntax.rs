@@ -4,15 +4,13 @@ use enum_convert::EnumInto;
 #[enum_into(Target)]
 enum Source {
     Struct {
-        #[enum_into(Target::Struct::a)] // Should be #[enum_into(Target::a)]
-        x: i32
-    }
+        #[enum_into(Target.a)] // Should be #[enum_into(Target::Struct.a)]
+        x: i32,
+    },
 }
 
 enum Target {
-    Struct {
-        a: i32
-    },
+    Struct { a: i32 },
 }
 
 fn main() {}

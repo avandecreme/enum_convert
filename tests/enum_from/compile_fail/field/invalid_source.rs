@@ -9,7 +9,7 @@ enum Source {
 enum Target {
     #[enum_from(Source::Data)]
     Stuff {
-        #[enum_from(Source::nonexistent)] // Invalid field name
+        #[enum_from(Source::Data.nonexistent)] // Invalid field name
         x: i64,
     },
 }

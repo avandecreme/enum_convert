@@ -88,7 +88,7 @@ enum Target {
 enum Target {
     #[enum_from]
     Record {
-        #[enum_from(Source::name)]  // Maps Source::name to Target::title
+        #[enum_from(Source::Record.name)]  // Maps Source::Record.name to Target::Record.title
         title: String,
         value: i32,
     }

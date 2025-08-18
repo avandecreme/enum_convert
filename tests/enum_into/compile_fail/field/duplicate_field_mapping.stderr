@@ -1,5 +1,5 @@
 error: Multiple mapping found for target enum `Target`
- --> tests/enum_into/compile_fail/field/duplicate_field_mapping.rs:7:9
+ --> tests/enum_into/compile_fail/field/duplicate_field_mapping.rs:8:9
   |
-7 |         #[enum_into(Target::a, Target::b)] // Should be #[enum_into(Target::a)]
+8 |         #[enum_into(Target::Struct.a, Target::Struct.b)]
   |         ^

@@ -116,6 +116,7 @@ fn generate_variant_match_arms(
                 generate_field_mappings(
                     fields,
                     &target_enum_name,
+                    &target_variant_name,
                 ).map(|(source_patterns, target_assignments)| {
                     quote! {
                         #source_enum::#source_variant_name { #(#source_patterns),* } => #target_enum_name::#target_variant_name { #(#target_assignments),* },
@@ -165,6 +166,7 @@ impl Parse for FieldAttributeArgs {
 
 struct FieldMapping {
     target_enum: Path,
+    target_variant: Ident,
     field_name: Ident,
 }
 
@@ -176,15 +178,18 @@ impl Parse for FieldMapping {
                 leading_colon: None,
                 segments: path.segments.iter().take(1).cloned().collect(),
             };
-            let field_name = path.segments.last().unwrap().ident.clone();
+            let target_variant = path.segments.last().unwrap().ident.clone();
+            input.parse::<Token![.]>()?;
+            let field_name: Ident = input.parse()?;
             Ok(FieldMapping {
                 target_enum,
+                target_variant,
                 field_name,
             })
         } else {
             Err(syn::Error::new_spanned(
                 path,
-                "Expected TargetEnum::field_name",
+                "Expected TargetEnum::TargetVariant.field_name",
             ))
         }
     }
@@ -306,7 +311,11 @@ fn extract_enum_into_targets(
         .map(|vec| vec.into_iter().flatten().collect())
 }
 
-fn extract_field_mapping(field: &Field, target_enum: &Path) -> syn::Result<Ident> {
+fn extract_field_mapping(
+    field: &Field,
+    target_enum: &Path,
+    target_variant: &Ident,
+) -> syn::Result<Ident> {
     let mut field_names = field
         .attrs
         .iter()
@@ -334,9 +343,10 @@ fn extract_field_mapping(field: &Field, target_enum: &Path) -> syn::Result<Ident
         }).collect::<Result<Vec<Vec<FieldMapping>>, syn::Error>>()?
         .into_iter()
         .flatten()
-        .filter_map(|FieldMapping { target_enum: enum_name, field_name }| {
+        .filter_map(|FieldMapping { target_enum: enum_name, target_variant: variant_name, field_name }| {
             // FIXME: that quote + to_string is suspicious
-            if quote!(#enum_name).to_string() == quote!(#target_enum).to_string()
+            if quote!(#enum_name).to_string() == quote!(#target_enum).to_string() &&
+                &variant_name == target_variant
             {
                 Some(field_name)
             } else {
@@ -367,6 +377,7 @@ fn extract_field_mapping(field: &Field, target_enum: &Path) -> syn::Result<Ident
 fn generate_field_mappings(
     fields: &syn::FieldsNamed,
     target_enum: &Path,
+    target_variant: &Ident,
 ) -> syn::Result<(Vec<proc_macro2::TokenStream>, Vec<proc_macro2::TokenStream>)> {
     let mut source_patterns = Vec::new();
     let mut target_assignments = Vec::new();
@@ -374,7 +385,7 @@ fn generate_field_mappings(
     for field in &fields.named {
         let source_field_name = field.ident.as_ref().unwrap();
 
-        let target_field_name = extract_field_mapping(field, target_enum)?;
+        let target_field_name = extract_field_mapping(field, target_enum, target_variant)?;
         source_patterns.push(quote! { #source_field_name });
         target_assignments.push(quote! { #target_field_name: #source_field_name.into() });
     }

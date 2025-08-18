@@ -76,9 +76,9 @@ use proc_macro::TokenStream;
 ///     Tuple(i64, String),
 ///     #[enum_from(FirstSource::DifferentName, SecondSource)]
 ///     Struct {
-///         #[enum_from(FirstSource::alpha, SecondSource::a)]
+///         #[enum_from(FirstSource::DifferentName.alpha, SecondSource::Struct.a)]
 ///         x: f64,
-///         #[enum_from(SecondSource::b)]
+///         #[enum_from(SecondSource::Struct.b)]
 ///         y: f64,
 ///         s: &'static str,
 ///     },
@@ -166,7 +166,7 @@ pub fn derive_enum_from(input: TokenStream) -> TokenStream {
 ///     Unit,  // Goes to both FirstTarget::Unit and SecondTarget::Unit
 ///     #[enum_into(FirstTarget::Data, SecondTarget::Info)]  // Maps to different variants
 ///     Record {
-///         #[enum_into(FirstTarget::name, SecondTarget::title)]  // Maps fields differently
+///         #[enum_into(FirstTarget::Data.name, SecondTarget::Info.title)]  // Maps fields differently
 ///         label: String,
 ///         value: i32
 ///     }
