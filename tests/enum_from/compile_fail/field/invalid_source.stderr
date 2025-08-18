@@ -1,0 +1,17 @@
+error[E0026]: variant `Source::Data` does not have a field named `nonexistent`
+  --> tests/enum_from/compile_fail/field/invalid_source.rs:12:29
+   |
+12 |         #[enum_from(Source::nonexistent)] // Invalid field name
+   |                             ^^^^^^^^^^^ variant `Source::Data` does not have this field
+
+error: pattern requires `..` due to inaccessible fields
+ --> tests/enum_from/compile_fail/field/invalid_source.rs:7:10
+  |
+7 | #[derive(EnumFrom)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `EnumFrom` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: ignore the inaccessible and unused fields
+  |
+12|         #[enum_from(Source::nonexistent, ..)] // Invalid field name
+  |                                        ++++

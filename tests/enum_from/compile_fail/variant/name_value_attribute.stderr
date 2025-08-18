@@ -1,0 +1,5 @@
+error: expected either #[enum_from] (if there is no ambiguity) or a list of variants, for example #[enum_from(Source1::VariantA, Source2::VariantB)]
+  --> tests/enum_from/compile_fail/variant/name_value_attribute.rs:10:5
+   |
+10 |     #[enum_from = "Source::Unit"] // Should be #[enum_from(Source::Unit)]
+   |     ^

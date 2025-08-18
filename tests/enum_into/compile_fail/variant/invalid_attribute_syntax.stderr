@@ -1,0 +1,5 @@
+error: Expected Enum or Enum::Variant
+ --> tests/enum_into/compile_fail/variant/invalid_attribute_syntax.rs:6:17
+  |
+6 |     #[enum_into(Target::Unit::Extra)]  // Invalid syntax - too many segments
+  |                 ^^^^^^^^^^^^^^^^^^^

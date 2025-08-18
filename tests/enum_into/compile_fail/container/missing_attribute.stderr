@@ -1,0 +1,7 @@
+error: proc-macro derive panicked
+ --> tests/enum_into/compile_fail/container/missing_attribute.rs:3:10
+  |
+3 | #[derive(EnumInto)]
+  |          ^^^^^^^^
+  |
+  = help: message: enum_into attribute with target enum names is required

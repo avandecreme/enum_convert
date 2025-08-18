@@ -1,0 +1,5 @@
+error: expected a list of source enums, for example #[enum_from(Source1, Source2)]
+ --> tests/enum_from/compile_fail/container/path_attribute.rs:8:1
+  |
+8 | #[enum_from] // Should be #[enum_from(Source)]
+  | ^
