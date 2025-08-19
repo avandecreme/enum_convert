@@ -1,7 +1,7 @@
 error[E0559]: variant `Target::Stuff` has no field named `nonexistent`
- --> tests/enum_into/compile_fail/field/invalid_target.rs:8:29
+ --> tests/enum_into/compile_fail/field/invalid_target.rs:8:35
   |
-8 |         #[enum_into(Target::nonexistent)] // Invalid field name
-  |                             ^^^^^^^^^^^ `Target::Stuff` does not have this field
+8 |         #[enum_into(Target::Stuff.nonexistent)] // Invalid field name
+  |                                   ^^^^^^^^^^^ `Target::Stuff` does not have this field
   |
   = note: all struct fields are already assigned

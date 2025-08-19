@@ -5,7 +5,7 @@ use enum_convert::EnumInto;
 enum Source {
     #[enum_into(Target::Stuff)]
     Data {
-        #[enum_into(Target::nonexistent)] // Invalid field name
+        #[enum_into(Target::Stuff.nonexistent)] // Invalid field name
         x: i32,
     },
 }

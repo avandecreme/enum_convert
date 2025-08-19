@@ -1,5 +1,5 @@
-error: Expected SourceEnum::field_name
-  --> tests/enum_from/compile_fail/field/invalid_attribute_syntax.rs:14:21
+error: Expected SourceEnum::SourceVariant.field_name
+  --> tests/enum_from/compile_fail/field/invalid_attribute_syntax.rs:12:21
    |
-14 |         #[enum_from(Source::Struct::x)] // Should be #[enum_from(Source::x)]
-   |                     ^^^^^^^^^^^^^^^^^
+12 |         #[enum_from(Source.x)] // Should be #[enum_from(Source::Struct.x)]
+   |                     ^^^^^^

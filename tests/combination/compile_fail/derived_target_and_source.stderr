@@ -1,0 +1,10 @@
+error[E0119]: conflicting implementations of trait `From<Source>` for type `Target`
+  --> tests/combination/compile_fail/derived_target_and_source.rs:12:10
+   |
+4  | #[derive(EnumInto)]
+   |          -------- first implementation here
+...
+12 | #[derive(EnumFrom)]
+   |          ^^^^^^^^ conflicting implementation for `Target`
+   |
+   = note: this error originates in the derive macro `EnumFrom` (in Nightly builds, run with -Z macro-backtrace for more info)
