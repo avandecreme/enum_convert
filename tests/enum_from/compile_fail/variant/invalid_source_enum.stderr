@@ -1,5 +1,5 @@
 error: source enum `NonExistent` is not specified in this enum's #[enum_from] annotation
-  --> tests/enum_from/compile_fail/variant/invalid_source_enum.rs:10:5
+  --> tests/enum_from/compile_fail/variant/invalid_source_enum.rs:10:25
    |
 10 |     #[enum_from(Source, NonExistent)] // Invalid source enum
-   |     ^
+   |                         ^^^^^^^^^^^

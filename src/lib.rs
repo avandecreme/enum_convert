@@ -1,7 +1,8 @@
+use proc_macro::TokenStream;
+
 mod enum_from;
 mod enum_into;
-
-use proc_macro::TokenStream;
+mod idents;
 
 /// Derives `From<Source> for AnnotatedEnum`.
 ///
