@@ -22,7 +22,10 @@ enum SecondTarget {
 
 fn main() {
     assert!(matches!(FirstTarget::from(Source::Unit), FirstTarget::Unit));
-    assert!(matches!(SecondTarget::from(Source::Unit), SecondTarget::Unit));
+    assert!(matches!(
+        SecondTarget::from(Source::Unit),
+        SecondTarget::Unit
+    ));
 
     assert!(matches!(FirstTarget::from(Source::Tuple(1)), FirstTarget::Tuple(i) if i == 1));
     assert!(matches!(SecondTarget::from(Source::Tuple(1)), SecondTarget::Tuple(i) if i == 1));

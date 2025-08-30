@@ -15,10 +15,7 @@ enum Target {
     #[enum_from(Source::Tuple)]
     TupleRenamed(i64, String),
     #[enum_from(Source::Struct)]
-    StructRenamed {
-        x: i64,
-        y: i64,
-    },
+    StructRenamed { x: i64, y: i64 },
 }
 
 fn main() {
