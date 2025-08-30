@@ -4,7 +4,7 @@ use enum_convert::EnumInto;
 #[enum_into(Target)]
 enum Source {
     Struct {
-        #[enum_into()] // Should be #[enum_into(Target::a)]
+        #[enum_into()] // Should be #[enum_into(Target::Struct.a)]
         x: i32
     }
 }

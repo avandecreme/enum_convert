@@ -1,5 +1,5 @@
-error: expected a list of field names, for example #[enum_from(Source1::field_a, Source2::field_b)]
+error: expected a list of field names, for example #[enum_from(Source1::VariantA.field_x, Source2::VariantB.field_y)]
   --> tests/enum_from/compile_fail/field/name_value_attribute.rs:14:9
    |
-14 |         #[enum_from = "Source::x"] // Should be #[enum_from(Source::x)]
+14 |         #[enum_from = "Source::Struct.x"] // Should be #[enum_from(Source::Struct.x)]
    |         ^

@@ -1,7 +1,7 @@
-error: proc-macro derive panicked
+error: EnumInto can only be derived for enums
  --> tests/enum_into/compile_fail/container/derive_on_struct.rs:3:10
   |
 3 | #[derive(EnumInto)] // Should only work on enums
   |          ^^^^^^^^
   |
-  = help: message: EnumInto can only be derived for enums
+  = note: this error originates in the derive macro `EnumInto` (in Nightly builds, run with -Z macro-backtrace for more info)

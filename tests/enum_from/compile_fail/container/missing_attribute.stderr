@@ -1,7 +1,7 @@
-error: proc-macro derive panicked
+error: enum_from attribute with source enum names is required
  --> tests/enum_from/compile_fail/container/missing_attribute.rs:7:10
   |
 7 | #[derive(EnumFrom)]
   |          ^^^^^^^^
   |
-  = help: message: enum_from attribute with source enum names is required
+  = note: this error originates in the derive macro `EnumFrom` (in Nightly builds, run with -Z macro-backtrace for more info)
