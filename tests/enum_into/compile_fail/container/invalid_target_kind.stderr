@@ -1,35 +1,5 @@
-error[E0433]: failed to resolve: `Unit` is a variant, not a module
- --> tests/enum_into/compile_fail/container/invalid_target_kind.rs:4:21
+error: expected `,`
+ --> tests/enum_into/compile_fail/container/invalid_target_kind.rs:4:19
   |
 4 | #[enum_into(Target::Unit)] // Should be #[enum_into(Target)]
-  |                     ^^^^ `Unit` is a variant, not a module
-  |
-help: there is an enum variant `crate::Source::Unit` and 3 others; try using the variant's enum
-  |
-4 - #[enum_into(Target::Unit)] // Should be #[enum_into(Target)]
-4 + #[enum_into(crate::Source)] // Should be #[enum_into(Target)]
-  |
-4 - #[enum_into(Target::Unit)] // Should be #[enum_into(Target)]
-4 + #[enum_into(crate::Target)] // Should be #[enum_into(Target)]
-  |
-4 - #[enum_into(Target::Unit)] // Should be #[enum_into(Target)]
-4 + #[enum_into(syn::Fields)] // Should be #[enum_into(Target)]
-  |
-
-error[E0573]: expected type, found variant `Target::Unit`
- --> tests/enum_into/compile_fail/container/invalid_target_kind.rs:4:13
-  |
-4 | #[enum_into(Target::Unit)] // Should be #[enum_into(Target)]
-  |             ^^^^^^^^^^^^ not a type
-  |
-help: try using the variant's enum
-  |
-4 - #[enum_into(Target::Unit)] // Should be #[enum_into(Target)]
-4 + #[enum_into(crate::Source)] // Should be #[enum_into(Target)]
-  |
-4 - #[enum_into(Target::Unit)] // Should be #[enum_into(Target)]
-4 + #[enum_into(crate::Target)] // Should be #[enum_into(Target)]
-  |
-4 - #[enum_into(Target::Unit)] // Should be #[enum_into(Target)]
-4 + #[enum_into(syn::Fields)] // Should be #[enum_into(Target)]
-  |
+  |                   ^

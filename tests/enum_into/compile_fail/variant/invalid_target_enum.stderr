@@ -1,5 +1,5 @@
 error: target enum `NonExistent` is not specified in this enum's #[enum_into] annotation
- --> tests/enum_into/compile_fail/variant/invalid_target_enum.rs:6:5
+ --> tests/enum_into/compile_fail/variant/invalid_target_enum.rs:6:25
   |
 6 |     #[enum_into(Target, NonExistent)] // Invalid target enum
-  |     ^
+  |                         ^^^^^^^^^^^

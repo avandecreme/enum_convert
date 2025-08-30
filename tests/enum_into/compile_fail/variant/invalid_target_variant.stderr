@@ -1,8 +1,13 @@
 error[E0599]: no variant or associated item named `NonExistent` found for enum `Target` in the current scope
   --> tests/enum_into/compile_fail/variant/invalid_target_variant.rs:6:25
    |
-6  |     #[enum_into(Target::NonExistent)] // Invalid variant name
-   |                         ^^^^^^^^^^^ variant or associated item not found in `Target`
+4  |   #[enum_into(Target)]
+   |  _____________-
+5  | | enum Source {
+6  | |     #[enum_into(Target::NonExistent)] // Invalid variant name
+   | |                        -^^^^^^^^^^^ variant or associated item not found in `Target`
+   | |________________________|
+   |
 ...
-10 | enum Target {
-   | ----------- variant or associated item `NonExistent` not found for this enum
+10 |   enum Target {
+   |   ----------- variant or associated item `NonExistent` not found for this enum
