@@ -6,7 +6,8 @@ enum Source {
     Field(i32),
 }
 
-struct Target { // Should be an enum
+// Should be an enum
+struct Target {
     Field: i32,
 }
 

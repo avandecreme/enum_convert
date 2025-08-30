@@ -5,14 +5,12 @@ use enum_convert::EnumInto;
 enum Source {
     Struct {
         #[enum_into()] // Should be #[enum_into(Target::Struct.a)]
-        x: i32
-    }
+        x: i32,
+    },
 }
 
 enum Target {
-    Struct {
-        a: i32
-    },
+    Struct { a: i32 },
 }
 
 fn main() {}

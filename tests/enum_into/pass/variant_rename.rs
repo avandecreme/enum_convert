@@ -19,7 +19,6 @@ enum Target {
     StructRenamed { x: i64, y: i64 },
 }
 
-
 fn main() {
     assert!(matches!(Target::from(Source::Unit), Target::UnitRenamed));
     assert!(matches!(Target::from(Source::Extra), Target::UnitRenamed));

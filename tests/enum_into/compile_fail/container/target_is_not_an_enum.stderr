@@ -1,13 +1,13 @@
 error[E0599]: no associated item named `Field` found for struct `Target` in the current scope
- --> tests/enum_into/compile_fail/container/target_is_not_an_enum.rs:6:5
-  |
-4 |   #[enum_into(Target)]
-  |  _____________-
-5 | | enum Source {
-6 | |     Field(i32),
-  | |    -^^^^^ associated item not found in `Target`
-  | |____|
-  |
+  --> tests/enum_into/compile_fail/container/target_is_not_an_enum.rs:6:5
+   |
+4  |   #[enum_into(Target)]
+   |  _____________-
+5  | | enum Source {
+6  | |     Field(i32),
+   | |    -^^^^^ associated item not found in `Target`
+   | |____|
+   |
 ...
-9 |   struct Target { // Should be an enum
-  |   ------------- associated item `Field` not found for this struct
+10 |   struct Target {
+   |   ------------- associated item `Field` not found for this struct

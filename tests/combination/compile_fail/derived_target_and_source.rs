@@ -1,5 +1,4 @@
-use enum_convert::{EnumInto, EnumFrom};
-
+use enum_convert::{EnumFrom, EnumInto};
 
 #[derive(EnumInto)]
 #[enum_into(Target)]
@@ -17,11 +16,7 @@ enum Target {
     #[enum_from]
     Tuple(i64, String),
     #[enum_from]
-    Struct {
-        x: i64,
-        y: i64,
-    },
+    Struct { x: i64, y: i64 },
 }
 
-fn main() {
-}
+fn main() {}
