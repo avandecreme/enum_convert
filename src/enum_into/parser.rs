@@ -234,8 +234,7 @@ fn extract_field_annotations(field: &Field) -> syn::Result<FieldAnnotations> {
             let build_err = || {
                 syn::Error::new(
                     attr.span(),
-                    // FIXME
-                    "expected a list of field names, for example #[enum_into(Target1::field_a, Target2::field_b)]",
+                    "expected a list of field names, for example #[enum_into(Target1::VariantA.field_x, Target2::VariantB.field_y)]",
                 )
             };
 

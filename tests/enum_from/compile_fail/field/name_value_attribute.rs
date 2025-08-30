@@ -11,7 +11,7 @@ enum Source {
 enum Target {
     #[enum_from]
     Struct {
-        #[enum_from = "Source::x"] // Should be #[enum_from(Source::x)]
+        #[enum_from = "Source::Struct.x"] // Should be #[enum_from(Source::Struct.x)]
         a: i32
     },
 }

@@ -1,5 +1,5 @@
-error: expected a list of field names, for example #[enum_into(Target1::field_a, Target2::field_b)]
+error: expected a list of field names, for example #[enum_into(Target1::VariantA.field_x, Target2::VariantB.field_y)]
  --> tests/enum_into/compile_fail/field/name_value_attribute.rs:7:9
   |
-7 |         #[enum_into = "Target::a"] // Should be #[enum_into(Target::a)]
+7 |         #[enum_into = "Target::a"] // Should be #[enum_into(Target::Data.a)]
   |         ^
