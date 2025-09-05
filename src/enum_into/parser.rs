@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use syn::{
-    Attribute, Data, DataEnum, DeriveInput, Field, Ident, Meta, Path, Token, Variant,
+    Attribute, Data, DataEnum, DeriveInput, Field, Ident, LitInt, Meta, Path, Token, Variant,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
 };
 
-use crate::idents::{ContainerIdent, FieldIdent, VariantIdent};
+use crate::idents::{ContainerIdent, FieldIdent, FieldRef, VariantIdent};
 
 /// A "dumb" parser of the EnumInto annotations
 /// There is no check of consistency between annotations here.
@@ -47,7 +47,7 @@ pub struct ContainerAnnotation(pub ContainerIdent);
 
 pub struct VariantAnnotations {
     pub variant_annotations: Vec<VariantAnnotation>,
-    pub fields_annotations: HashMap<FieldIdent, FieldAnnotations>,
+    pub fields_annotations: HashMap<FieldRef, FieldAnnotations>,
 }
 
 pub enum VariantAnnotation {
@@ -92,10 +92,12 @@ pub struct FieldAnnotations {
     pub field_span: Span,
 }
 
+#[derive(Clone)]
 pub struct FieldAnnotation {
     pub target_enum: ContainerIdent,
     pub target_variant: VariantIdent,
-    pub target_field: FieldIdent,
+    pub target_field: FieldRef,
+    pub field_span: Span,
 }
 
 impl Parse for FieldAnnotation {
@@ -105,11 +107,22 @@ impl Parse for FieldAnnotation {
             let target_enum = ContainerIdent(path.segments[0].ident.clone());
             let target_variant = VariantIdent(path.segments[1].ident.clone());
             input.parse::<Token![.]>()?;
-            let target_field = FieldIdent(input.parse()?);
+            let field_span = input.span();
+            let target_field = if let Ok(ident) = input.parse::<Ident>() {
+                FieldRef::FieldIdent(FieldIdent(ident))
+            } else if let Ok(lit) = input.parse::<LitInt>() {
+                FieldRef::FieldPos(lit.base10_parse()?)
+            } else {
+                Err(syn::Error::new(
+                    field_span,
+                    "Expected either a field identifier or a field position",
+                ))?
+            };
             Ok(FieldAnnotation {
                 target_enum,
                 target_variant,
                 target_field,
+                field_span,
             })
         } else {
             Err(syn::Error::new_spanned(
@@ -211,11 +224,19 @@ fn extract_variant_annotations(variant: &Variant) -> syn::Result<VariantAnnotati
     let fields_annotations = variant
         .fields
         .iter()
-        .filter_map(|field| {
-            field.ident.as_ref().map(|field_ident| {
-                extract_field_annotations(field)
-                    .map(|field_annotations| (FieldIdent(field_ident.clone()), field_annotations))
-            })
+        .enumerate()
+        .map(|(pos, field)| {
+            let annotations = extract_field_annotations(field);
+            match &field.ident {
+                Some(field_ident) => annotations.map(|field_annotations| {
+                    (
+                        FieldRef::FieldIdent(FieldIdent(field_ident.clone())),
+                        field_annotations,
+                    )
+                }),
+                None => annotations
+                    .map(|field_annotations| (FieldRef::FieldPos(pos), field_annotations)),
+            }
         })
         .collect::<syn::Result<Vec<_>>>()?
         .into_iter()

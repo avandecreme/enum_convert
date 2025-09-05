@@ -1,0 +1,5 @@
+error: Unexpected mapping to positional field for struct variant
+ --> tests/enum_into/compile_fail/field/mixing_target_variant_kind.rs:8:36
+  |
+8 |         #[enum_into(Target::Struct.0)] // .0 Does not make sense for a Struct target
+  |                                    ^

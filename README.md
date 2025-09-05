@@ -100,6 +100,7 @@ enum Target {
 use enum_convert::EnumFrom;
 
 enum Source {
+    Tuple(String, u8),
     Record {
         name: String,
         value: i32,
@@ -109,6 +110,12 @@ enum Source {
 #[derive(EnumFrom)]
 #[enum_from(Source)]
 enum Target {
+    #[enum_from]
+    Tuple(
+        // We effectively re-order fields
+        #[enum_from(Source::Tuple.1)] u8,
+        #[enum_from(Source::Tuple.0)] String,
+    ),
     #[enum_from]
     Record {
         #[enum_from(Source::Record.name)]  // Maps Source::Record.name to Target::Record.title

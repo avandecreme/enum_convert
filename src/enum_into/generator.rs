@@ -1,12 +1,14 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{Fields, Variant};
 
 use crate::{
-    enum_into::parser::{ContainerAnnotation, FieldAnnotations, ParsedEnumInto, VariantAnnotation},
-    idents::{ContainerIdent, FieldIdent, VariantIdent},
+    enum_into::parser::{
+        ContainerAnnotation, FieldAnnotation, FieldAnnotations, ParsedEnumInto, VariantAnnotation,
+    },
+    idents::{ContainerIdent, FieldIdent, FieldRef, VariantIdent},
 };
 
 /// A struct holding all the data necessary to generate a TokenStream.
@@ -19,9 +21,28 @@ pub struct EnumIntoGenerator {
 
 struct VariantsMapping(HashMap<VariantIdent, Vec<VariantMapping>>);
 
-struct VariantMapping {
-    source_variant: VariantIdent,
-    fields_mapping: HashMap<FieldIdent, FieldIdent>,
+enum VariantMapping {
+    Unit {
+        source_variant: VariantIdent,
+    },
+    Tuple {
+        source_variant: VariantIdent,
+        fields_mapping: HashMap<usize, usize>,
+    },
+    Struct {
+        source_variant: VariantIdent,
+        fields_mapping: HashMap<FieldIdent, FieldIdent>,
+    },
+}
+
+impl VariantMapping {
+    fn source_variant(&self) -> &VariantIdent {
+        match self {
+            VariantMapping::Unit { source_variant } => source_variant,
+            VariantMapping::Tuple { source_variant, .. } => source_variant,
+            VariantMapping::Struct { source_variant, .. } => source_variant,
+        }
+    }
 }
 
 impl EnumIntoGenerator {
@@ -54,7 +75,7 @@ fn generate_from_impl(
         .into_iter()
         .flat_map(|(target_variant, variant_mappings)| {
             variant_mappings.into_iter().map(|variant_mapping| {
-                let source_variant = source_variants.get(&variant_mapping.source_variant).expect(
+                let source_variant = source_variants.get(variant_mapping.source_variant()).expect(
                     "All source variants in variant_mapping should be present in source_variants",
                 );
                 generate_match_arm(
@@ -86,26 +107,41 @@ fn generate_match_arm(
     source_enum: &ContainerIdent,
     variant: &Variant,
 ) -> TokenStream {
-    let source_variant = &variant.ident;
-
-    match &variant.fields {
-        Fields::Unit => quote! {
+    match (&variant.fields, variant_mapping) {
+        (Fields::Unit, VariantMapping::Unit { source_variant }) => quote! {
             #source_enum::#source_variant => #target_enum::#target_variant,
         },
-        Fields::Unnamed(fields) => {
-            let field_names: Vec<_> = (0..fields.unnamed.len())
-                .map(|i| quote::format_ident!("field_{}", i))
-                .collect();
-            let field_conversions: Vec<_> = field_names
-                .iter()
-                .map(|name| quote! { #name.into() })
-                .collect();
+        (
+            Fields::Unnamed(fields),
+            VariantMapping::Tuple {
+                source_variant,
+                fields_mapping,
+            },
+        ) => {
+            let (source_fields, target_fields): (Vec<_>, Vec<_>) = (0..fields.unnamed.len())
+                .map(|field_source_pos| {
+                    let field_target_pos = fields_mapping
+                        .get(&field_source_pos)
+                        .unwrap_or(&field_source_pos);
+                    let target_field_name = quote::format_ident!("field_{field_target_pos}");
+                    (
+                        quote::format_ident!("field_{field_source_pos}"),
+                        quote! { #target_field_name.into() },
+                    )
+                })
+                .unzip();
             quote! {
-                #source_enum::#source_variant(#(#field_names),*) =>
-                #target_enum::#target_variant(#(#field_conversions),*),
+                #source_enum::#source_variant(#(#source_fields),*) =>
+                #target_enum::#target_variant(#(#target_fields),*),
             }
         }
-        Fields::Named(fields) => {
+        (
+            Fields::Named(fields),
+            VariantMapping::Struct {
+                source_variant,
+                fields_mapping,
+            },
+        ) => {
             let (source_fields, target_fields): (Vec<_>, Vec<_>) = fields
                 .named
                 .iter()
@@ -117,10 +153,7 @@ fn generate_match_arm(
                             .expect("A named field should always have an ident")
                             .clone(),
                     );
-                    let target_field = &variant_mapping
-                        .fields_mapping
-                        .get(&source_field)
-                        .unwrap_or(&source_field);
+                    let target_field = &fields_mapping.get(&source_field).unwrap_or(&source_field);
                     (
                         quote! { #source_field },
                         quote! { #target_field: #source_field.into() },
@@ -133,6 +166,7 @@ fn generate_match_arm(
                 #target_enum::#target_variant { #(#target_fields),* },
             }
         }
+        (_, _) => panic!("Unexpected mixing of variant types"),
     }
 }
 
@@ -188,14 +222,54 @@ impl TryFrom<ParsedEnumInto> for EnumIntoGenerator {
                     target_enum,
                     &target_variant,
                 )?;
+                let fields = &source_variant.fields;
+                let source_variant = VariantIdent(source_variant.ident.clone());
+                let variant_mapping = match fields {
+                    Fields::Unit => VariantMapping::Unit { source_variant },
+                    Fields::Unnamed(_) => VariantMapping::Tuple {
+                        source_variant,
+                        fields_mapping: fields_mapping
+                            .into_iter()
+                            .map(|source_to_target| match source_to_target {
+                                (
+                                    FieldRef::FieldPos(source_pos),
+                                    FieldAnnotation {
+                                        target_field: FieldRef::FieldPos(target_pos),
+                                        ..
+                                    },
+                                ) => Ok((source_pos, target_pos)),
+                                (_, FieldAnnotation { field_span, .. }) => Err(syn::Error::new(
+                                    field_span,
+                                    "Unexpected mapping to named field for tuple variant",
+                                )),
+                            })
+                            .collect::<syn::Result<_>>()?,
+                    },
+                    Fields::Named(_) => VariantMapping::Struct {
+                        source_variant,
+                        fields_mapping: fields_mapping
+                            .into_iter()
+                            .map(|source_to_target| match source_to_target {
+                                (
+                                    FieldRef::FieldIdent(source_ident),
+                                    FieldAnnotation {
+                                        target_field: FieldRef::FieldIdent(target_ident),
+                                        ..
+                                    },
+                                ) => Ok((source_ident, target_ident)),
+                                (_, FieldAnnotation { field_span, .. }) => Err(syn::Error::new(
+                                    field_span,
+                                    "Unexpected mapping to positional field for struct variant",
+                                )),
+                            })
+                            .collect::<syn::Result<_>>()?,
+                    },
+                };
 
                 let mut variant_mappings = variants_mapping
                     .remove(&target_variant)
                     .unwrap_or_else(Vec::new);
-                variant_mappings.push(VariantMapping {
-                    source_variant: VariantIdent(source_variant.ident.clone()),
-                    fields_mapping,
-                });
+                variant_mappings.push(variant_mapping);
 
                 variants_mapping.insert(target_variant, variant_mappings);
             }
@@ -220,13 +294,13 @@ impl TryFrom<ParsedEnumInto> for EnumIntoGenerator {
 }
 
 fn get_fields_mapping(
-    fields_annotations: &HashMap<FieldIdent, FieldAnnotations>,
+    fields_annotations: &HashMap<FieldRef, FieldAnnotations>,
     target_enum: &ContainerIdent,
     target_variant: &VariantIdent,
-) -> syn::Result<HashMap<FieldIdent, FieldIdent>> {
+) -> syn::Result<BTreeMap<FieldRef, FieldAnnotation>> {
     Ok(fields_annotations
         .iter()
-        .map(|(source_field, field_annotations)| {
+        .filter_map(|(source_field, field_annotations)| {
             let annotations = field_annotations
                 .fields_annotations
                 .iter()
@@ -235,16 +309,14 @@ fn get_fields_mapping(
                         && field_annotation.target_variant == *target_variant
                 })
                 .collect::<Vec<_>>();
-            let target_field = match annotations.len() {
-                0 => source_field.clone(),
-                1 => annotations[0].target_field.clone(),
-                _ => Err(syn::Error::new(
+            match annotations.len() {
+                0 => None,
+                1 => Some(Ok((source_field.clone(), annotations[0].clone()))),
+                _ => Some(Err(syn::Error::new(
                     field_annotations.field_span,
                     format!("Multiple mapping found for target enum `{target_enum}`"),
-                ))?,
-            };
-
-            Ok((source_field.clone(), target_field))
+                ))),
+            }
         })
         .collect::<syn::Result<Vec<_>>>()?
         .into_iter()
