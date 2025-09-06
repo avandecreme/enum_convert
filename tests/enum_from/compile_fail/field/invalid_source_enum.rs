@@ -9,7 +9,8 @@ enum Source {
 enum Target {
     #[enum_from]
     Struct {
-        #[enum_from(Source::Struct::x)] // Should be #[enum_from(Source::Struct.x)]
+        // Should be #[enum_from(Source::Struct.x)]
+        #[enum_from(NonExistent::Struct.x)]
         a: i32,
     },
 }
