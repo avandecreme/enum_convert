@@ -1,0 +1,5 @@
+error: Unexpected mapping to positional field for struct variant
+  --> tests/enum_from/compile_fail/field/mixing_source_variant_kind.rs:12:35
+   |
+12 |         #[enum_from(Source::Tuple.0)] // .0 Does not make sense for a Struct source
+   |                                   ^

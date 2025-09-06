@@ -56,7 +56,7 @@ mod idents;
 ///
 /// enum FirstSource {
 ///     Unit,
-///     Tuple(i32, &'static str),
+///     Tuple(&'static str, i32),
 ///     DifferentName {
 ///         alpha: f64,
 ///         y: f64,
@@ -75,7 +75,10 @@ mod idents;
 ///     #[enum_from(FirstSource, SecondSource::Empty)]
 ///     Unit,
 ///     #[enum_from(FirstSource)]
-///     Tuple(i64, String),
+///     Tuple(
+///         #[enum_from(FirstSource::Tuple.1)] i64,
+///         #[enum_from(FirstSource::Tuple.0)] String,
+///     ),
 ///     #[enum_from(FirstSource::DifferentName, SecondSource)]
 ///     Struct {
 ///         #[enum_from(FirstSource::DifferentName.alpha, SecondSource::Struct.a)]
@@ -96,7 +99,7 @@ mod idents;
 /// let target: Target = second_source.into();
 /// assert!(matches!(target, Target::Unit));
 ///
-/// let first_source = FirstSource::Tuple(42, "hello");
+/// let first_source = FirstSource::Tuple("hello", 42);
 /// let target: Target = first_source.into();
 /// assert!(matches!(target, Target::Tuple(42, ref s) if s == "hello"));
 ///
@@ -166,6 +169,11 @@ pub fn derive_enum_from(input: TokenStream) -> TokenStream {
 /// #[enum_into(FirstTarget, SecondTarget)]
 /// enum Source {
 ///     Unit,  // Goes to both FirstTarget::Unit and SecondTarget::Unit
+///     Tuple(
+///         // Reorder fields for SecondTarget only
+///         #[enum_into(SecondTarget::Tuple.1)] &'static str,
+///         #[enum_into(SecondTarget::Tuple.0)] i32,
+///     ),
 ///     #[enum_into(FirstTarget::Data, SecondTarget::Info)]  // Maps to different variants
 ///     Record {
 ///         #[enum_into(FirstTarget::Data.name, SecondTarget::Info.title)]  // Maps fields differently
@@ -176,11 +184,13 @@ pub fn derive_enum_from(input: TokenStream) -> TokenStream {
 ///
 /// enum FirstTarget {
 ///     Unit,
+///     Tuple(String, i32),
 ///     Data { name: String, value: i64 }
 /// }
 ///
 /// enum SecondTarget {
 ///     Unit,
+///     Tuple(i32, String),
 ///     Info { title: String, value: i64 }
 /// }
 ///
@@ -192,6 +202,15 @@ pub fn derive_enum_from(input: TokenStream) -> TokenStream {
 /// let source = Source::Unit;
 /// let second_target: SecondTarget = source.into();
 /// assert!(matches!(second_target, SecondTarget::Unit));
+///
+/// let source = Source::Tuple("hello", 42);
+/// let first_target: FirstTarget = source.into();
+/// assert!(matches!(first_target, FirstTarget::Tuple(ref s, value) if s == "hello" && value == 42));
+///
+/// // Source::Tuple can also go to SecondTarget::Into with different fields order
+/// let source = Source::Tuple("hello", 42);
+/// let second_target: SecondTarget = source.into();
+/// assert!(matches!(second_target, SecondTarget::Tuple(value, ref s) if s == "hello" && value == 42));
 ///
 /// let source = Source::Record { label: "test".to_string(), value: 42 };
 /// let first_target: FirstTarget = source.into();

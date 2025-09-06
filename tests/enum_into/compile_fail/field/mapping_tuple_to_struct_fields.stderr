@@ -1,0 +1,5 @@
+error: Unexpected mapping to named field for tuple variant
+ --> tests/enum_into/compile_fail/field/mapping_tuple_to_struct_fields.rs:8:36
+  |
+8 |         #[enum_into(Target::Struct.aa)] i32,
+  |                                    ^^
