@@ -1,0 +1,5 @@
+error: Field mapping for unknown enum
+ --> tests/enum_into/compile_fail/field/invalid_target_enum.rs:8:21
+  |
+8 |         #[enum_into(NonExistent::Struct.a)]
+  |                     ^^^^^^^^^^^

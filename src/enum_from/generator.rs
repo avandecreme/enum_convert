@@ -200,7 +200,7 @@ impl TryFrom<ParsedEnumFrom> for EnumFromGenerator {
             })
             .collect::<HashMap<_, _>>();
 
-        for (target_variant, variant_annotations) in variants_annotations {
+        for (target_variant, mut variant_annotations) in variants_annotations {
             for variant_annotation in variant_annotations.variant_annotations {
                 let (source_enum, source_variant, span) = get_source_enum_and_variant(
                     &target_variant,
@@ -217,8 +217,8 @@ impl TryFrom<ParsedEnumFrom> for EnumFromGenerator {
                     )
                 })?;
 
-                let fields_mapping = get_fields_mapping(
-                    &variant_annotations.fields_annotations,
+                let fields_annotations = extract_fields_annotations(
+                    &mut variant_annotations.fields_annotations,
                     &source_enum,
                     &source_variant,
                 )?;
@@ -228,7 +228,7 @@ impl TryFrom<ParsedEnumFrom> for EnumFromGenerator {
                     Fields::Unit => VariantMapping::Unit { target_variant },
                     Fields::Unnamed(_) => VariantMapping::Tuple {
                         target_variant,
-                        fields_mapping: fields_mapping
+                        fields_mapping: fields_annotations
                             .into_iter()
                             .map(|target_to_source| match target_to_source {
                                 (
@@ -247,7 +247,7 @@ impl TryFrom<ParsedEnumFrom> for EnumFromGenerator {
                     },
                     Fields::Named(_) => VariantMapping::Struct {
                         target_variant,
-                        fields_mapping: fields_mapping
+                        fields_mapping: fields_annotations
                             .into_iter()
                             .map(|target_to_source| match target_to_source {
                                 (
@@ -268,6 +268,8 @@ impl TryFrom<ParsedEnumFrom> for EnumFromGenerator {
 
                 variants_mapping.insert(source_variant, variant_mapping);
             }
+
+            check_unused_fields_annotations(&source_enums, variant_annotations.fields_annotations)?;
             target_variants.insert(VariantIdent(target_variant.ident.clone()), target_variant);
         }
 
@@ -279,29 +281,52 @@ impl TryFrom<ParsedEnumFrom> for EnumFromGenerator {
     }
 }
 
-fn get_fields_mapping(
-    fields_annotations: &HashMap<FieldRef, FieldAnnotations>,
+fn check_unused_fields_annotations(
+    source_enums: &HashMap<ContainerIdent, VariantsMapping>,
+    fields_annotations: HashMap<FieldRef, FieldAnnotations>,
+) -> syn::Result<()> {
+    for field_annotations in fields_annotations.into_values() {
+        for field_annotation in field_annotations.fields_annotations {
+            if source_enums.contains_key(&field_annotation.source_enum) {
+                Err(syn::Error::new(
+                    field_annotation.variant_span,
+                    "Field mapping for unexpected enum and variant combination",
+                ))?
+            } else {
+                Err(syn::Error::new(
+                    field_annotation.enum_span,
+                    "Field mapping for unknown enum",
+                ))?
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn extract_fields_annotations(
+    fields_annotations: &mut HashMap<FieldRef, FieldAnnotations>,
     source_enum: &ContainerIdent,
     source_variant: &VariantIdent,
 ) -> syn::Result<BTreeMap<FieldRef, FieldAnnotation>> {
     Ok(fields_annotations
-        .iter()
+        .iter_mut()
         .filter_map(|(target_field, field_annotations)| {
-            let annotations = field_annotations
+            let mut annotations = field_annotations
                 .fields_annotations
-                .iter()
-                .filter(|field_annotation| {
+                .extract_if(.., |field_annotation| {
                     field_annotation.source_enum == *source_enum
                         && field_annotation.source_variant == *source_variant
                 })
                 .collect::<Vec<_>>();
-            match annotations.len() {
-                0 => None,
-                1 => Some(Ok((target_field.clone(), annotations[0].clone()))),
-                _ => Some(Err(syn::Error::new(
+            let annotation = annotations.pop();
+            if annotations.pop().is_some() {
+                Some(Err(syn::Error::new(
                     field_annotations.field_span,
                     format!("Multiple mapping found for source enum `{source_enum}`"),
-                ))),
+                )))
+            } else {
+                annotation.map(|annotation| Ok((target_field.clone(), annotation)))
             }
         })
         .collect::<syn::Result<Vec<_>>>()?

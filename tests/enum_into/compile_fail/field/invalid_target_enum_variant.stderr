@@ -1,0 +1,5 @@
+error: Field mapping for unexpected enum and variant combination
+ --> tests/enum_into/compile_fail/field/invalid_target_enum_variant.rs:8:29
+  |
+8 |         #[enum_into(Target::NonExistent.a)]
+  |                             ^^^^^^^^^^^

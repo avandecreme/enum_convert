@@ -1,5 +1,5 @@
 error: Expected TargetEnum::TargetVariant.field_name
  --> tests/enum_into/compile_fail/field/invalid_attribute_syntax.rs:7:21
   |
-7 |         #[enum_into(Target.a)] // Should be #[enum_into(Target::Struct.a)]
-  |                     ^^^^^^
+7 |         #[enum_into(Target::Struct::a)] // Should be #[enum_into(Target::Struct.a)]
+  |                     ^^^^^^^^^^^^^^^^^

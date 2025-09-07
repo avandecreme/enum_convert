@@ -1,10 +1,7 @@
 use enum_convert::EnumFrom;
 
 enum Source {
-    Struct {
-        aa: i32,
-        bb: i32,
-    },
+    Struct { aa: i32, bb: i32 },
 }
 
 #[derive(EnumFrom)]

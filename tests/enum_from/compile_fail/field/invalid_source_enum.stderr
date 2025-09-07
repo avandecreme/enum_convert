@@ -1,0 +1,5 @@
+error: Field mapping for unknown enum
+  --> tests/enum_from/compile_fail/field/invalid_source_enum.rs:13:21
+   |
+13 |         #[enum_from(NonExistent::Struct.x)]
+   |                     ^^^^^^^^^^^
