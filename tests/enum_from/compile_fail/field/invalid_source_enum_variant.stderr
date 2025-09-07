@@ -1,0 +1,5 @@
+error: Field mapping for unexpected enum and variant combination
+  --> tests/enum_from/compile_fail/field/invalid_source_enum_variant.rs:13:29
+   |
+13 |         #[enum_from(Source::NonExistent.x)]
+   |                             ^^^^^^^^^^^

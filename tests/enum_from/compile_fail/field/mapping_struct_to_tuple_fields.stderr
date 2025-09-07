@@ -1,5 +1,5 @@
 error: Unexpected mapping to named field for tuple variant
-  --> tests/enum_from/compile_fail/field/mapping_struct_to_tuple_fields.rs:15:36
+  --> tests/enum_from/compile_fail/field/mapping_struct_to_tuple_fields.rs:12:36
    |
-15 |         #[enum_from(Source::Struct.aa)] i32,
+12 |         #[enum_from(Source::Struct.aa)] i32,
    |                                    ^^

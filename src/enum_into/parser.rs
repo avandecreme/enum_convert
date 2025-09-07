@@ -97,15 +97,15 @@ pub struct FieldAnnotation {
     pub target_enum: ContainerIdent,
     pub target_variant: VariantIdent,
     pub target_field: FieldRef,
+    pub enum_span: Span,
+    pub variant_span: Span,
     pub field_span: Span,
 }
 
 impl Parse for FieldAnnotation {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let path: Path = input.parse()?;
+        let mut path: Path = input.parse()?;
         if path.segments.len() == 2 {
-            let target_enum = ContainerIdent(path.segments[0].ident.clone());
-            let target_variant = VariantIdent(path.segments[1].ident.clone());
             input.parse::<Token![.]>()?;
             let field_span = input.span();
             let target_field = if let Ok(ident) = input.parse::<Ident>() {
@@ -118,11 +118,15 @@ impl Parse for FieldAnnotation {
                     "Expected either a field identifier or a field position",
                 ))?
             };
+            let variant_segment = path.segments.pop().unwrap().into_value();
+            let enum_segment = path.segments.pop().unwrap().into_value();
             Ok(FieldAnnotation {
-                target_enum,
-                target_variant,
-                target_field,
+                enum_span: enum_segment.span(),
+                variant_span: variant_segment.span(),
                 field_span,
+                target_enum: ContainerIdent(enum_segment.ident),
+                target_variant: VariantIdent(variant_segment.ident),
+                target_field,
             })
         } else {
             Err(syn::Error::new_spanned(
