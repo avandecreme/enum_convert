@@ -24,7 +24,7 @@ jobs:
     - name: Check formatting
       run: |
         nix develop --command cargo fmt -- --check
-        nix develop --command find tests -name *.rs -exec rustfmt {} --check \;
+        nix develop --command bash -c 'find tests -name "*.rs" -print0 | xargs -0 -n1 rustfmt --check'
 
     - name: Run clippy
       run: nix develop --command cargo clippy -- -D warnings
