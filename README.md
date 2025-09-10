@@ -104,7 +104,8 @@ enum Source {
     Record {
         name: String,
         value: i32,
-    }
+    },
+    Point(i32, i32),
 }
 
 #[derive(EnumFrom)]
@@ -121,7 +122,14 @@ enum Target {
         #[enum_from(Source::Record.name)]  // Maps Source::Record.name to Target::Record.title
         title: String,
         value: i32,
-    }
+    },
+    #[enum_from]
+    Point {
+        #[enum_from(Source::Point.0)]
+        x: i64,
+        #[enum_from(Source::Point.1)]
+        y: i64,
+    },
 }
 ```
 

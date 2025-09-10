@@ -1,0 +1,5 @@
+error: Missing required mapping to named field for Source::Struct
+  --> tests/enum_from/compile_fail/field/missing_annotation_for_struct_to_tuple.rs:13:9
+   |
+13 |         i64, // Annotation #[enum_from(Source::Struct.aa)] is missing
+   |         ^^^
