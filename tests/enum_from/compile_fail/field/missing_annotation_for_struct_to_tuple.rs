@@ -10,7 +10,7 @@ enum Target {
     #[enum_from(Source::Struct)]
     Tuple(
         #[enum_from(Source::Struct.aa)] i32,
-        #[enum_from(Source::Struct.bb)] i32,
+        i64, // Annotation #[enum_from(Source::Struct.aa)] is missing
     ),
 }
 

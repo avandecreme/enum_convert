@@ -1,0 +1,5 @@
+error: Missing required mapping to named field for Target::Tuple
+ --> tests/enum_into/compile_fail/field/missing_annotation_for_struct_to_tuple.rs:9:9
+  |
+9 |         aa: i32,
+  |         ^^

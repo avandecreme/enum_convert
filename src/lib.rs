@@ -17,7 +17,7 @@ mod idents;
 ///     Unit,
 ///     OtherUnit,
 ///     Tuple(i32, &'static str),
-///     DifferentName { x: i32, y: i32 }
+///     DifferentName { x: i32, y: i32 },
 /// }
 ///
 /// #[derive(EnumFrom)]
@@ -29,7 +29,7 @@ mod idents;
 ///     Tuple(i64, String),
 ///     #[enum_from(Source::DifferentName)]
 ///     Struct { x: f64, y: f64 },
-///     Extra // This variant cannot be built from Source
+///     Extra, // This variant cannot be built from Source
 /// }
 ///
 /// let source = Source::Unit;
@@ -50,7 +50,7 @@ mod idents;
 /// assert!(matches!(target, Target::Struct { x, y } if x == 1.0 && y == 2.0));
 /// ```
 ///
-/// ## Multiple source enums
+/// ## Multiple source enums with fields mapping
 /// ```
 /// use enum_convert::EnumFrom;
 ///
@@ -66,7 +66,7 @@ mod idents;
 ///
 /// enum SecondSource {
 ///     Empty,
-///     Struct { a: i32, b: i32, s: &'static str },
+///     Data(i32, i32, &'static str),
 /// }
 ///
 /// #[derive(EnumFrom)]
@@ -80,14 +80,15 @@ mod idents;
 ///         #[enum_from(FirstSource::Tuple.0)] String,
 ///     ),
 ///     #[enum_from(FirstSource::DifferentName, SecondSource)]
-///     Struct {
-///         #[enum_from(FirstSource::DifferentName.alpha, SecondSource::Struct.a)]
+///     Data {
+///         #[enum_from(FirstSource::DifferentName.alpha, SecondSource::Data.0)]
 ///         x: f64,
-///         #[enum_from(SecondSource::Struct.b)]
+///         #[enum_from(SecondSource::Data.1)]
 ///         y: f64,
+///         #[enum_from(SecondSource::Data.2)]
 ///         s: &'static str,
 ///     },
-///     Extra
+///     Extra,
 /// }
 ///
 /// let first_source = FirstSource::Unit;
@@ -105,12 +106,12 @@ mod idents;
 ///
 /// let first_source = FirstSource::DifferentName { alpha: 1.0, y: 2.0, s: "hello" };
 /// let target: Target = first_source.into();
-/// assert!(matches!(target, Target::Struct { x, y, s } if x == 1.0 && y == 2.0 && s == "hello"));
+/// assert!(matches!(target, Target::Data { x, y, s } if x == 1.0 && y == 2.0 && s == "hello"));
 ///
-/// // Target::Struct can also come from SecondSource::Struct
-/// let second_source = SecondSource::Struct { a: 1, b: 2, s: "hello" };
+/// // Target::Data can also come from SecondSource::Data
+/// let second_source = SecondSource::Data(1, 2, "hello");
 /// let target: Target = second_source.into();
-/// assert!(matches!(target, Target::Struct { x, y, s } if x == 1.0 && y == 2.0 && s == "hello"));
+/// assert!(matches!(target, Target::Data { x, y, s } if x == 1.0 && y == 2.0 && s == "hello"));
 /// ```
 #[proc_macro_derive(EnumFrom, attributes(enum_from))]
 pub fn derive_enum_from(input: TokenStream) -> TokenStream {
@@ -176,22 +177,23 @@ pub fn derive_enum_from(input: TokenStream) -> TokenStream {
 ///     ),
 ///     #[enum_into(FirstTarget::Data, SecondTarget::Info)]  // Maps to different variants
 ///     Record {
-///         #[enum_into(FirstTarget::Data.name, SecondTarget::Info.title)]  // Maps fields differently
+///         #[enum_into(FirstTarget::Data.name, SecondTarget::Info.0)]  // Maps fields differently
 ///         label: String,
+///         #[enum_into(SecondTarget::Info.1)]
 ///         value: i32
-///     }
+///     },
 /// }
 ///
 /// enum FirstTarget {
 ///     Unit,
 ///     Tuple(String, i32),
-///     Data { name: String, value: i64 }
+///     Data { name: String, value: i64 },
 /// }
 ///
 /// enum SecondTarget {
 ///     Unit,
 ///     Tuple(i32, String),
-///     Info { title: String, value: i64 }
+///     Info(String, i64),
 /// }
 ///
 /// let source = Source::Unit;
@@ -219,7 +221,7 @@ pub fn derive_enum_from(input: TokenStream) -> TokenStream {
 /// // Source::Record can also go to SecondTarget::Info with different field mapping
 /// let source = Source::Record { label: "test".to_string(), value: 42 };
 /// let second_target: SecondTarget = source.into();
-/// assert!(matches!(second_target, SecondTarget::Info { title, value } if title == "test" && value == 42));
+/// assert!(matches!(second_target, SecondTarget::Info(label, value) if label == "test" && value == 42));
 /// ```
 #[proc_macro_derive(EnumInto, attributes(enum_into))]
 pub fn derive_enum_into(input: TokenStream) -> TokenStream {

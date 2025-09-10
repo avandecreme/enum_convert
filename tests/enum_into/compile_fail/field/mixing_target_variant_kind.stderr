@@ -1,5 +1,5 @@
-error: Unexpected mapping to positional field for struct variant
- --> tests/enum_into/compile_fail/field/mixing_target_variant_kind.rs:8:36
-  |
-8 |         #[enum_into(Target::Struct.0)] // .0 Does not make sense for a Struct target
-  |                                    ^
+error: Unexpected mapping to named field while another field mapped to a positional field.
+  --> tests/enum_into/compile_fail/field/mixing_target_variant_kind.rs:10:36
+   |
+10 |         #[enum_into(Target::Struct.b)]
+   |                                    ^
