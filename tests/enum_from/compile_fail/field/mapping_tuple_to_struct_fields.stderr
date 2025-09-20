@@ -1,5 +1,0 @@
-error: Unexpected mapping to positional field for struct variant
-  --> tests/enum_from/compile_fail/field/mapping_tuple_to_struct_fields.rs:12:35
-   |
-12 |         #[enum_from(Source::Tuple.0)]
-   |                                   ^

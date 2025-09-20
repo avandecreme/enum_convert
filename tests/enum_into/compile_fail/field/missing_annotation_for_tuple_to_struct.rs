@@ -5,13 +5,14 @@ use enum_convert::EnumInto;
 enum Source {
     #[enum_into(Target::Struct)]
     Tuple(
-        #[enum_into(Target::Struct.aa)] i32,
-        #[enum_into(Target::Struct.bb)] i32,
+        // #[enum_into(Target::Struct.b)] missing
+        i32,
+        #[enum_into(Target::Struct.a)] i32,
     ),
 }
 
 enum Target {
-    Struct { aa: i32, bb: i32 },
+    Struct { a: i64, b: i32 },
 }
 
 fn main() {}

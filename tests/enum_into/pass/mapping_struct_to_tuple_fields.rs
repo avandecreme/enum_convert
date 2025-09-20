@@ -16,4 +16,9 @@ enum Target {
     Tuple(i32, i32),
 }
 
-fn main() {}
+fn main() {
+    assert!(matches!(
+        Target::from(Source::Struct { a: 1, b: 2 }),
+        Target::Tuple(a, b) if a == 1 && b == 2,
+    ));
+}

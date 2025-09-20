@@ -1,0 +1,5 @@
+error: Missing required mapping to named field for Source::Tuple
+  --> tests/enum_from/compile_fail/field/missing_annotation_for_tuple_to_struct.rs:13:9
+   |
+13 |         a: i64,
+   |         ^
