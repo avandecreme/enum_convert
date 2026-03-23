@@ -1,7 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
 use proc_macro2::{Span, TokenStream};
-use quote::quote;
 use syn::{Fields, FieldsNamed, FieldsUnnamed, Variant, spanned::Spanned as _};
 
 use crate::{
@@ -9,6 +8,7 @@ use crate::{
         ContainerAnnotation, FieldAnnotation, FieldAnnotations, ParsedEnumInto, VariantAnnotation,
     },
     idents::{ContainerIdent, FieldIdent, FieldRef, VariantIdent},
+    tokens,
 };
 
 /// A struct holding all the data necessary to generate a TokenStream.
@@ -60,17 +60,12 @@ impl EnumIntoGenerator {
         let source_enum = &self.source_enum;
         let source_variants = &self.source_variants;
 
-        let impl_blocks = self
-            .target_enums
+        self.target_enums
             .into_iter()
             .map(|(target_enum, variants_mapping)| {
                 generate_from_impl(target_enum, variants_mapping, source_enum, source_variants)
             })
-            .collect::<Vec<_>>();
-
-        quote! {
-            #(#impl_blocks)*
-        }
+            .collect()
     }
 }
 
@@ -80,7 +75,7 @@ fn generate_from_impl(
     source_enum: &ContainerIdent,
     source_variants: &HashMap<VariantIdent, Variant>,
 ) -> TokenStream {
-    let match_arms = variants_mapping
+    let match_arms: TokenStream = variants_mapping
         .0
         .into_iter()
         .flat_map(|(target_variant, variant_mappings)| {
@@ -97,17 +92,9 @@ fn generate_from_impl(
                 )
             }).collect::<Vec<_>>()
         })
-        .collect::<Vec<_>>();
+        .collect();
 
-    quote! {
-        impl From<#source_enum> for #target_enum {
-            fn from(value: #source_enum) -> Self {
-                match value {
-                    #(#match_arms)*
-                }
-            }
-        }
-    }
+    tokens::impl_from(source_enum, &target_enum, match_arms)
 }
 
 fn generate_match_arm(
@@ -117,9 +104,10 @@ fn generate_match_arm(
     source_enum: &ContainerIdent,
     variant: &Variant,
 ) -> TokenStream {
+    let span = Span::call_site();
     match (&variant.fields, variant_mapping) {
         (Fields::Unit, VariantMapping::UnitToUnit { source_variant }) => {
-            quote! { #source_enum::#source_variant => #target_enum::#target_variant, }
+            tokens::unit_to_unit_arm(source_enum, &source_variant, target_enum, target_variant)
         }
         (
             Fields::Unnamed(fields),
@@ -133,17 +121,20 @@ fn generate_match_arm(
                     let field_target_pos = fields_mapping
                         .get(&field_source_pos)
                         .unwrap_or(&field_source_pos);
-                    let target_field_name = quote::format_ident!("field_{field_target_pos}");
                     (
-                        quote::format_ident!("field_{field_source_pos}"),
-                        quote! { #target_field_name.into() },
+                        tokens::field_ident(field_source_pos, span),
+                        tokens::field_ident(*field_target_pos, span),
                     )
                 })
                 .unzip();
-            quote! {
-                #source_enum::#source_variant(#(#source_fields),*) =>
-                #target_enum::#target_variant(#(#target_fields),*),
-            }
+            tokens::tuple_to_tuple_arm(
+                source_enum,
+                &source_variant,
+                target_enum,
+                target_variant,
+                &source_fields,
+                &target_fields,
+            )
         }
         (
             Fields::Unnamed(fields),
@@ -152,21 +143,23 @@ fn generate_match_arm(
                 fields_mapping,
             },
         ) => {
-            let (source_fields, target_fields): (Vec<_>, Vec<_>) = (0..fields.unnamed.len())
+            let source_fields: Vec<_> = (0..fields.unnamed.len())
                 .map(|field_source_pos| {
-                    let target_ident = fields_mapping
+                    fields_mapping
                         .get(&field_source_pos)
-                        .expect("fields_mapping exhaustiveness should have been checked");
-                    (
-                        quote! { #target_ident },
-                        quote! { #target_ident: #target_ident.into() },
-                    )
+                        .expect("fields_mapping exhaustiveness should have been checked")
+                        .clone()
                 })
-                .unzip();
-            quote! {
-                #source_enum::#source_variant(#(#source_fields),*) =>
-                #target_enum::#target_variant { #(#target_fields),* },
-            }
+                .collect();
+            let field_refs: Vec<_> = source_fields.iter().collect();
+            tokens::tuple_to_struct_arm(
+                source_enum,
+                &source_variant,
+                target_enum,
+                target_variant,
+                &field_refs,
+                &field_refs,
+            )
         }
         (
             Fields::Named(fields),
@@ -175,7 +168,20 @@ fn generate_match_arm(
                 fields_mapping,
             },
         ) => {
-            let (source_fields, target_fields): (Vec<_>, Vec<_>) = fields
+            let source_fields_owned: Vec<_> = fields
+                .named
+                .iter()
+                .map(|field| {
+                    FieldIdent(
+                        field
+                            .ident
+                            .as_ref()
+                            .expect("A named field should always have an ident")
+                            .clone(),
+                    )
+                })
+                .collect();
+            let target_fields_owned: Vec<_> = fields
                 .named
                 .iter()
                 .map(|field| {
@@ -186,18 +192,20 @@ fn generate_match_arm(
                             .expect("A named field should always have an ident")
                             .clone(),
                     );
-                    let target_field = &fields_mapping.get(&source_field).unwrap_or(&source_field);
-                    (
-                        quote! { #source_field },
-                        quote! { #target_field: #source_field.into() },
-                    )
+                    let target_field = fields_mapping.get(&source_field).cloned().unwrap_or(source_field.clone());
+                    (target_field, source_field)
                 })
-                .unzip();
-
-            quote! {
-                #source_enum::#source_variant { #(#source_fields),* } =>
-                #target_enum::#target_variant { #(#target_fields),* },
-            }
+                .collect();
+            let source_refs: Vec<_> = source_fields_owned.iter().collect();
+            let target_refs: Vec<_> = target_fields_owned.iter().map(|(t, s)| (t, s)).collect();
+            tokens::struct_to_struct_arm(
+                source_enum,
+                &source_variant,
+                target_enum,
+                target_variant,
+                &source_refs,
+                &target_refs,
+            )
         }
         (
             Fields::Named(_),
@@ -206,18 +214,21 @@ fn generate_match_arm(
                 fields_mapping,
             },
         ) => {
-            let (source_fields, target_fields): (Vec<_>, Vec<_>) = fields_mapping
+            let ordered_fields: Vec<_> = fields_mapping
                 .into_iter()
                 .map(|(source_ident, target_pos)| (target_pos, source_ident))
                 .collect::<BTreeMap<usize, FieldIdent>>()
                 .into_values()
-                .map(|source_ident| (quote! { #source_ident }, quote! { #source_ident.into() }))
-                .unzip();
-
-            quote! {
-                #source_enum::#source_variant { #(#source_fields),* } =>
-                #target_enum::#target_variant(#(#target_fields),*),
-            }
+                .collect();
+            let field_refs: Vec<_> = ordered_fields.iter().collect();
+            tokens::struct_to_tuple_arm(
+                source_enum,
+                &source_variant,
+                target_enum,
+                target_variant,
+                &field_refs,
+                &field_refs,
+            )
         }
         (_, _) => panic!("Unexpected mixing of variant types"),
     }

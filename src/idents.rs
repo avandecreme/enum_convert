@@ -1,7 +1,11 @@
 use std::fmt::Display;
 
-use quote::ToTokens;
+use proc_macro2::{TokenStream, TokenTree};
 use syn::Ident;
+
+pub trait ToTokenStream {
+    fn to_token_stream(&self) -> TokenStream;
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ContainerIdent(pub Ident);
@@ -12,9 +16,9 @@ impl Display for ContainerIdent {
     }
 }
 
-impl ToTokens for ContainerIdent {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        self.0.to_tokens(tokens);
+impl ToTokenStream for ContainerIdent {
+    fn to_token_stream(&self) -> TokenStream {
+        TokenStream::from(TokenTree::Ident(self.0.clone()))
     }
 }
 
@@ -27,9 +31,9 @@ impl Display for VariantIdent {
     }
 }
 
-impl ToTokens for VariantIdent {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        self.0.to_tokens(tokens);
+impl ToTokenStream for VariantIdent {
+    fn to_token_stream(&self) -> TokenStream {
+        TokenStream::from(TokenTree::Ident(self.0.clone()))
     }
 }
 
@@ -42,9 +46,9 @@ impl Display for FieldIdent {
     }
 }
 
-impl ToTokens for FieldIdent {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        self.0.to_tokens(tokens);
+impl ToTokenStream for FieldIdent {
+    fn to_token_stream(&self) -> TokenStream {
+        TokenStream::from(TokenTree::Ident(self.0.clone()))
     }
 }
 
