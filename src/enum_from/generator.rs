@@ -2,13 +2,13 @@ use std::collections::{BTreeMap, HashMap};
 
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use syn::{Fields, FieldsNamed, FieldsUnnamed, Variant, spanned::Spanned};
 
 use crate::{
     enum_from::parser::{
         ContainerAnnotation, FieldAnnotation, FieldAnnotations, ParsedEnumFrom, VariantAnnotation,
     },
     idents::{ContainerIdent, FieldIdent, FieldRef, VariantIdent},
+    parse::{self, Fields, Variant},
 };
 
 /// A struct holding all the data necessary to generate a TokenStream.
@@ -127,7 +127,7 @@ fn generate_match_arm(
                 fields_mapping,
             },
         ) => {
-            let (source_fields, target_fields): (Vec<_>, Vec<_>) = (0..fields.unnamed.len())
+            let (source_fields, target_fields): (Vec<_>, Vec<_>) = (0..fields.len())
                 .map(|field_target_pos| {
                     let field_source_pos = fields_mapping
                         .get(&field_target_pos)
@@ -151,7 +151,7 @@ fn generate_match_arm(
                 fields_mapping,
             },
         ) => {
-            let (source_fields, target_fields): (Vec<_>, Vec<_>) = (0..fields.unnamed.len())
+            let (source_fields, target_fields): (Vec<_>, Vec<_>) = (0..fields.len())
                 .map(|field_target_pos| {
                     let source_ident = fields_mapping
                         .get(&field_target_pos)
@@ -172,7 +172,6 @@ fn generate_match_arm(
             },
         ) => {
             let (source_fields, target_fields): (Vec<_>, Vec<_>) = fields
-                .named
                 .iter()
                 .map(|field| {
                     let target_field = FieldIdent(
@@ -225,7 +224,7 @@ fn generate_match_arm(
 }
 
 impl TryFrom<ParsedEnumFrom> for EnumFromGenerator {
-    type Error = syn::Error;
+    type Error = parse::Error;
 
     fn try_from(
         ParsedEnumFrom {
@@ -233,9 +232,9 @@ impl TryFrom<ParsedEnumFrom> for EnumFromGenerator {
             container_annotations,
             variants_annotations,
         }: ParsedEnumFrom,
-    ) -> Result<Self, Self::Error> {
+    ) -> parse::Result<Self> {
         let single_source_enum = match &container_annotations[..] {
-            [] => Err(syn::Error::new(
+            [] => Err(parse::Error::new(
                 Span::call_site(),
                 "enum_from attribute with source enum names is required",
             ))?,
@@ -264,7 +263,7 @@ impl TryFrom<ParsedEnumFrom> for EnumFromGenerator {
                 )?;
 
                 let VariantsMapping(variants_mapping) = source_enums.get_mut(&source_enum).ok_or_else(|| {
-                    syn::Error::new(
+                    parse::Error::new(
                         span,
                         format!(
                             "source enum `{source_enum}` is not specified in this enum's #[enum_from] annotation"
@@ -308,7 +307,7 @@ fn compute_variant_mapping(
     fields_annotations: BTreeMap<FieldRef, FieldAnnotation>,
     fields: &Fields,
     target_variant: VariantIdent,
-) -> syn::Result<VariantMapping> {
+) -> parse::Result<VariantMapping> {
     match (
         fields,
         fields_annotations
@@ -347,7 +346,7 @@ fn compute_variant_mapping(
 fn compute_tuple_to_tuple_variant_mapping(
     fields_annotations: BTreeMap<FieldRef, FieldAnnotation>,
     target_variant: VariantIdent,
-) -> syn::Result<VariantMapping> {
+) -> parse::Result<VariantMapping> {
     let fields_mapping = fields_annotations
         .into_iter()
         .map(|target_to_source| match target_to_source {
@@ -358,12 +357,12 @@ fn compute_tuple_to_tuple_variant_mapping(
                     ..
                 },
             ) => Ok((target_pos, source_pos)),
-            (_, FieldAnnotation { field_span, .. }) => Err(syn::Error::new(
+            (_, FieldAnnotation { field_span, .. }) => Err(parse::Error::new(
                 field_span,
                 "Unexpected mapping to named field while another field mapped to a positional field.",
             )),
         })
-        .collect::<syn::Result<_>>()?;
+        .collect::<parse::Result<_>>()?;
 
     Ok(VariantMapping::TupleToTuple {
         target_variant,
@@ -374,7 +373,7 @@ fn compute_tuple_to_tuple_variant_mapping(
 fn compute_struct_to_struct_variant_mapping(
     fields_annotations: BTreeMap<FieldRef, FieldAnnotation>,
     target_variant: VariantIdent,
-) -> syn::Result<VariantMapping> {
+) -> parse::Result<VariantMapping> {
     let fields_mapping = fields_annotations
         .into_iter()
         .map(|target_to_source| match target_to_source {
@@ -385,12 +384,12 @@ fn compute_struct_to_struct_variant_mapping(
                     ..
                 },
             ) => Ok((target_ident, source_ident)),
-            (_, FieldAnnotation { field_span, .. }) => Err(syn::Error::new(
+            (_, FieldAnnotation { field_span, .. }) => Err(parse::Error::new(
                 field_span,
                 "Unexpected mapping to positional field while another field mapped to a named field.",
             )),
         })
-        .collect::<syn::Result<_>>()?;
+        .collect::<parse::Result<_>>()?;
 
     Ok(VariantMapping::StructToStruct {
         target_variant,
@@ -402,9 +401,9 @@ fn compute_struct_to_tuple_variant_mapping(
     source_enum: &ContainerIdent,
     source_variant: &VariantIdent,
     fields_annotations: BTreeMap<FieldRef, FieldAnnotation>,
-    fields: &FieldsUnnamed,
+    fields: &[crate::parse::Field],
     target_variant: VariantIdent,
-) -> syn::Result<VariantMapping> {
+) -> parse::Result<VariantMapping> {
     let fields_mapping = fields_annotations
         .into_iter()
         .map(|target_to_source| match target_to_source {
@@ -419,18 +418,18 @@ fn compute_struct_to_tuple_variant_mapping(
                 },
             ) => Ok((target_pos, source_ident)),
             (FieldRef::FieldPos(_), FieldAnnotation { source_field: FieldRef::FieldPos(_), field_span, .. }) => {
-                Err(syn::Error::new(
+                Err(parse::Error::new(
                     field_span,
                     "Unexpected mapping to positional field while another field mapped to a named field.",
                 ))
             },
         })
-        .collect::<syn::Result<HashMap<usize, FieldIdent>>>()?;
+        .collect::<parse::Result<HashMap<usize, FieldIdent>>>()?;
 
-    for (pos, field) in fields.unnamed.iter().enumerate() {
+    for (pos, field) in fields.iter().enumerate() {
         if !fields_mapping.contains_key(&pos) {
-            Err(syn::Error::new(
-                field.span(),
+            Err(parse::Error::new(
+                field.span,
                 format!(
                     "Missing required mapping to named field for {source_enum}::{source_variant}"
                 ),
@@ -448,9 +447,9 @@ fn compute_tuple_to_struct_variant_mapping(
     source_enum: &ContainerIdent,
     source_variant: &VariantIdent,
     fields_annotations: BTreeMap<FieldRef, FieldAnnotation>,
-    fields: &FieldsNamed,
+    fields: &[crate::parse::Field],
     target_variant: VariantIdent,
-) -> syn::Result<VariantMapping> {
+) -> parse::Result<VariantMapping> {
     let fields_mapping = fields_annotations
         .into_iter()
         .map(|target_to_source| match target_to_source {
@@ -464,19 +463,19 @@ fn compute_tuple_to_struct_variant_mapping(
                     ..
                 },
             ) => Ok((target_ident, source_pos)),
-            (FieldRef::FieldIdent(_), FieldAnnotation { source_field: FieldRef::FieldIdent(_), field_span, .. }) => Err(syn::Error::new(
+            (FieldRef::FieldIdent(_), FieldAnnotation { source_field: FieldRef::FieldIdent(_), field_span, .. }) => Err(parse::Error::new(
                 field_span,
                 "Unexpected mapping to named field while another field mapped to a positional field.",
             )),
         })
-        .collect::<syn::Result<HashMap<FieldIdent, usize>>>()?;
+        .collect::<parse::Result<HashMap<FieldIdent, usize>>>()?;
 
-    for field in fields.named.iter() {
+    for field in fields.iter() {
         if !fields_mapping.contains_key(&FieldIdent(
             field.ident.clone().expect("Named fields have idents"),
         )) {
-            Err(syn::Error::new(
-                field.span(),
+            Err(parse::Error::new(
+                field.span,
                 format!(
                     "Missing required mapping to named field for {source_enum}::{source_variant}"
                 ),
@@ -493,16 +492,16 @@ fn compute_tuple_to_struct_variant_mapping(
 fn check_unused_fields_annotations(
     source_enums: &HashMap<ContainerIdent, VariantsMapping>,
     fields_annotations: HashMap<FieldRef, FieldAnnotations>,
-) -> syn::Result<()> {
+) -> parse::Result<()> {
     for field_annotations in fields_annotations.into_values() {
         for field_annotation in field_annotations.fields_annotations {
             if source_enums.contains_key(&field_annotation.source_enum) {
-                Err(syn::Error::new(
+                Err(parse::Error::new(
                     field_annotation.variant_span,
                     "Field mapping for unexpected enum and variant combination",
                 ))?
             } else {
-                Err(syn::Error::new(
+                Err(parse::Error::new(
                     field_annotation.enum_span,
                     "Field mapping for unknown enum",
                 ))?
@@ -517,7 +516,7 @@ fn extract_fields_annotations(
     fields_annotations: &mut HashMap<FieldRef, FieldAnnotations>,
     source_enum: &ContainerIdent,
     source_variant: &VariantIdent,
-) -> syn::Result<BTreeMap<FieldRef, FieldAnnotation>> {
+) -> parse::Result<BTreeMap<FieldRef, FieldAnnotation>> {
     Ok(fields_annotations
         .iter_mut()
         .filter_map(|(target_field, field_annotations)| {
@@ -530,7 +529,7 @@ fn extract_fields_annotations(
                 .collect::<Vec<_>>();
             let annotation = annotations.pop();
             if annotations.pop().is_some() {
-                Some(Err(syn::Error::new(
+                Some(Err(parse::Error::new(
                     field_annotations.field_span,
                     format!("Multiple mapping found for source enum `{source_enum}`"),
                 )))
@@ -538,7 +537,7 @@ fn extract_fields_annotations(
                 annotation.map(|annotation| Ok((target_field.clone(), annotation)))
             }
         })
-        .collect::<syn::Result<Vec<_>>>()?
+        .collect::<parse::Result<Vec<_>>>()?
         .into_iter()
         .collect())
 }
@@ -548,7 +547,7 @@ fn get_source_enum_and_variant(
     target_variant: &Variant,
     single_source_enum: Option<&ContainerIdent>,
     variant_annotation: VariantAnnotation,
-) -> syn::Result<(ContainerIdent, VariantIdent, Span)> {
+) -> parse::Result<(ContainerIdent, VariantIdent, Span)> {
     match variant_annotation {
         VariantAnnotation::Nothing { span } => {
             if let Some(source_enum) = single_source_enum {
@@ -558,7 +557,7 @@ fn get_source_enum_and_variant(
                     span,
                 ))
             } else {
-                Err(syn::Error::new(
+                Err(parse::Error::new(
                     span,
                     "When multiple source enums are specified, each variant must specify from which enum to convert with #[enum_from(Enum)] or #[enum_from(Enum::Variant)]",
                 ))

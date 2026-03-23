@@ -2,14 +2,9 @@ use std::collections::HashMap;
 
 use proc_macro::TokenStream;
 use proc_macro2::Span;
-use syn::{
-    Attribute, Data, DataEnum, DeriveInput, Field, Ident, LitInt, Meta, Path, Token, Variant,
-    parse::{Parse, ParseStream},
-    punctuated::Punctuated,
-    spanned::Spanned,
-};
 
 use crate::idents::{ContainerIdent, FieldIdent, FieldRef, VariantIdent};
+use crate::parse::{self, Attribute, Data, DeriveInput, Field, Fields, ParseStream, Variant};
 
 /// A "dumb" parser of the EnumFrom annotations
 /// There is no check of consistency between annotations here.
@@ -20,20 +15,19 @@ pub struct ParsedEnumFrom {
 }
 
 impl ParsedEnumFrom {
-    pub fn parse(input: TokenStream) -> syn::Result<ParsedEnumFrom> {
-        let derive_input: DeriveInput = syn::parse(input)?;
+    pub fn parse(input: TokenStream) -> parse::Result<ParsedEnumFrom> {
+        let derive_input: DeriveInput = parse::parse_derive_input(input)?;
 
         let data_enum = match derive_input.data {
             Data::Enum(data) => data,
-            Data::Struct(_) | Data::Union(_) => Err(syn::Error::new(
-                Span::call_site(),
-                "EnumFrom can only be derived for enums",
-            ))?,
+            Data::Other(span) => {
+                return Err(parse::Error::new(span, "EnumFrom can only be derived for enums"));
+            }
         };
 
         let target_enum = ContainerIdent(derive_input.ident);
         let container_annotations = extract_container_annotations(&derive_input.attrs)?;
-        let variants_annotations = extract_variants_annotations(data_enum)?;
+        let variants_annotations = extract_variants_annotations(data_enum.variants)?;
 
         Ok(ParsedEnumFrom {
             target_enum,
@@ -65,27 +59,39 @@ pub enum VariantAnnotation {
     },
 }
 
-impl Parse for VariantAnnotation {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let span = input.span();
-        let path: Path = input.parse()?;
-        if path.segments.len() == 1 {
-            Ok(Self::EnumOnly {
+fn parse_variant_annotation(stream: &mut ParseStream) -> parse::Result<VariantAnnotation> {
+    let span = stream.span();
+    let first_ident = stream.parse_ident()?;
+
+    // Check if there's a :: following
+    if stream.peek_punct() == Some(':') {
+        stream.parse_punct(':')?;
+        stream.parse_punct(':')?;
+        let variant_ident = stream.parse_ident()?;
+
+        // Check for extra segments (like Enum::Variant::Extra) which are invalid
+        if stream.peek_punct() == Some(':') {
+            // Consume the rest to get the end span
+            stream.parse_punct(':')?;
+            stream.parse_punct(':')?;
+            let last = stream.parse_ident()?;
+            return Err(parse::Error::new_span_range(
                 span,
-                enum_ident: ContainerIdent(path.segments[0].ident.clone()),
-            })
-        } else if path.segments.len() == 2 {
-            Ok(Self::EnumVariant {
-                span,
-                enum_ident: ContainerIdent(path.segments[0].ident.clone()),
-                variant_ident: VariantIdent(path.segments[1].ident.clone()),
-            })
-        } else {
-            Err(syn::Error::new_spanned(
-                path,
+                last.span(),
                 "Expected Enum or Enum::Variant",
-            ))
+            ));
         }
+
+        Ok(VariantAnnotation::EnumVariant {
+            span,
+            enum_ident: ContainerIdent(first_ident),
+            variant_ident: VariantIdent(variant_ident),
+        })
+    } else {
+        Ok(VariantAnnotation::EnumOnly {
+            span,
+            enum_ident: ContainerIdent(first_ident),
+        })
     }
 }
 
@@ -104,75 +110,95 @@ pub struct FieldAnnotation {
     pub field_span: Span,
 }
 
-impl Parse for FieldAnnotation {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut path: Path = input.parse()?;
-        if path.segments.len() == 2 {
-            input.parse::<Token![.]>()?;
-            let field_span = input.span();
-            let source_field = if let Ok(ident) = input.parse::<Ident>() {
-                FieldRef::FieldIdent(FieldIdent(ident))
-            } else if let Ok(lit) = input.parse::<LitInt>() {
-                FieldRef::FieldPos(lit.base10_parse()?)
-            } else {
-                Err(syn::Error::new(
-                    field_span,
-                    "Expected either a field identifier or a field position",
-                ))?
-            };
-            let variant_segment = path.segments.pop().unwrap().into_value();
-            let enum_segment = path.segments.pop().unwrap().into_value();
-            Ok(FieldAnnotation {
-                enum_span: enum_segment.span(),
-                variant_span: variant_segment.span(),
-                field_span,
-                source_enum: ContainerIdent(enum_segment.ident),
-                source_variant: VariantIdent(variant_segment.ident),
-                source_field,
-            })
-        } else {
-            Err(syn::Error::new_spanned(
-                path,
-                "Expected SourceEnum::SourceVariant.field_name",
-            ))
-        }
+fn parse_field_annotation(stream: &mut ParseStream) -> parse::Result<FieldAnnotation> {
+    let enum_span = stream.span();
+    let enum_ident = stream.parse_ident()?;
+
+    stream.parse_punct(':')?;
+    stream.parse_punct(':')?;
+
+    let variant_span = stream.span();
+    let variant_ident = stream.parse_ident()?;
+
+    // Check for `.` - if we see `::` instead, give a helpful error
+    if stream.peek_punct() == Some(':') {
+        // Consume the rest to get the end span
+        stream.parse_punct(':')?;
+        stream.parse_punct(':')?;
+        let last = stream.parse_ident()?;
+        return Err(parse::Error::new_span_range(
+            enum_span,
+            last.span(),
+            "Expected SourceEnum::SourceVariant.field_name",
+        ));
     }
+    stream.parse_punct('.')?;
+
+    let field_span = stream.span();
+    let source_field = if let Some(ident) = stream.peek_ident() {
+        let ident = ident.clone();
+        stream.parse_ident()?;
+        FieldRef::FieldIdent(FieldIdent(ident))
+    } else if stream.peek_literal().is_some() {
+        let lit = stream.parse_literal()?;
+        let pos = parse::parse_int(&lit)?;
+        FieldRef::FieldPos(pos)
+    } else {
+        return Err(parse::Error::new(
+            field_span,
+            "Expected either a field identifier or a field position",
+        ));
+    };
+
+    Ok(FieldAnnotation {
+        enum_span,
+        variant_span,
+        field_span,
+        source_enum: ContainerIdent(enum_ident),
+        source_variant: VariantIdent(variant_ident),
+        source_field,
+    })
 }
 
 fn extract_container_annotations(
     container_attrs: &[Attribute],
-) -> syn::Result<Vec<ContainerAnnotation>> {
+) -> parse::Result<Vec<ContainerAnnotation>> {
     let res = container_attrs
         .iter()
-        .filter(|attr| attr.path().is_ident("enum_from"))
+        .filter(|attr| attr.path_is_ident("enum_from"))
         .map(|attr| {
             let build_err = || {
-                syn::Error::new(
-                    attr.span(),
+                parse::Error::new(
+                    attr.span,
                     "expected a list of source enums, for example #[enum_from(Source1, Source2)]",
                 )
             };
 
-            match &attr.meta {
-                Meta::List(meta_list) => meta_list
-                    .parse_args_with(|input: ParseStream| {
-                        Punctuated::<Ident, Token![,]>::parse_terminated(input)
-                    })
-                    .and_then(|idents| {
-                        if idents.empty_or_trailing() {
-                            Err(build_err())
-                        } else {
-                            Ok(idents
-                                .into_iter()
-                                .map(ContainerIdent)
-                                .map(ContainerAnnotation)
-                                .collect::<Vec<_>>())
-                        }
-                    }),
-                Meta::Path(_) | Meta::NameValue(_) => Err(build_err()),
+            if attr.is_list() {
+                let args = attr.parse_args()?;
+                let mut stream = ParseStream::new(args);
+
+                if stream.is_empty() {
+                    return Err(build_err());
+                }
+
+                let idents = stream.parse_terminated(|s| s.parse_ident())?;
+                stream.expect_empty()?;
+
+                if idents.is_empty() {
+                    return Err(build_err());
+                }
+
+                Ok(idents
+                    .into_iter()
+                    .map(ContainerIdent)
+                    .map(ContainerAnnotation)
+                    .collect::<Vec<_>>())
+            } else {
+                Err(build_err())
             }
         })
-        .collect::<syn::Result<Vec<_>>>()?
+        .collect::<parse::Result<Vec<_>>>()?
         .into_iter()
         .flatten()
         .collect::<Vec<_>>();
@@ -180,72 +206,84 @@ fn extract_container_annotations(
 }
 
 fn extract_variants_annotations(
-    data_enum: DataEnum,
-) -> syn::Result<HashMap<Variant, VariantAnnotations>> {
-    let res = data_enum
-        .variants
+    variants: Vec<Variant>,
+) -> parse::Result<HashMap<Variant, VariantAnnotations>> {
+    let res = variants
         .into_iter()
         .map(|variant| {
             extract_variant_annotations(&variant).map(|annotations| (variant, annotations))
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<parse::Result<Vec<_>>>()?;
     Ok(res.into_iter().collect())
 }
 
-fn extract_variant_annotations(variant: &Variant) -> syn::Result<VariantAnnotations> {
+fn extract_variant_annotations(variant: &Variant) -> parse::Result<VariantAnnotations> {
     let variant_annotations = variant
         .attrs
         .iter()
-        .filter(|attr| attr.path().is_ident("enum_from"))
+        .filter(|attr| attr.path_is_ident("enum_from"))
         .map(|attr| {
             let build_err = || {
-                syn::Error::new(
-                    attr.span(),
+                parse::Error::new(
+                    attr.span,
                     "expected either #[enum_from] (if there is no ambiguity) or a list of variants, for example #[enum_from(Source1::VariantA, Source2::VariantB)]",
                 )
             };
-            match &attr.meta {
-                Meta::Path(_) => Ok(vec![VariantAnnotation::Nothing { span: attr.span() }]),
-                Meta::List(meta_list) => {
-                    meta_list.parse_args_with(|input: ParseStream| {
-                        Punctuated::<VariantAnnotation, Token![,]>::parse_terminated(input)
-                            .and_then(|annotations| {
-                                if annotations.empty_or_trailing() {
-                                    Err(build_err())
-                                } else {
-                                    Ok(annotations.into_iter().collect())
-                                }
-                            })
-                    })
-                },
-                Meta::NameValue(_) => Err(build_err()),
+
+            if attr.is_path() {
+                Ok(vec![VariantAnnotation::Nothing { span: attr.span }])
+            } else if attr.is_list() {
+                let args = attr.parse_args()?;
+                let mut stream = ParseStream::new(args);
+
+                if stream.is_empty() {
+                    return Err(build_err());
+                }
+
+                let annotations = stream.parse_terminated(parse_variant_annotation)?;
+                stream.expect_empty()?;
+
+                if annotations.is_empty() {
+                    return Err(build_err());
+                }
+
+                Ok(annotations)
+            } else {
+                Err(build_err())
             }
         })
-        .collect::<syn::Result<Vec<_>>>()?
+        .collect::<parse::Result<Vec<_>>>()?
         .into_iter()
         .flatten()
         .collect::<Vec<_>>();
 
-    let fields_annotations = variant
-        .fields
-        .iter()
-        .enumerate()
-        .map(|(pos, field)| {
-            let annotations = extract_field_annotations(field);
-            match &field.ident {
-                Some(field_ident) => annotations.map(|field_annotations| {
-                    (
-                        FieldRef::FieldIdent(FieldIdent(field_ident.clone())),
-                        field_annotations,
-                    )
-                }),
-                None => annotations
-                    .map(|field_annotations| (FieldRef::FieldPos(pos), field_annotations)),
-            }
-        })
-        .collect::<syn::Result<Vec<_>>>()?
-        .into_iter()
-        .collect();
+    let fields_annotations = match &variant.fields {
+        Fields::Unit => HashMap::new(),
+        Fields::Named(fields) => fields
+            .iter()
+            .map(|field| {
+                let annotations = extract_field_annotations(field)?;
+                let ident = field
+                    .ident
+                    .as_ref()
+                    .expect("A named field should always have an ident")
+                    .clone();
+                Ok((FieldRef::FieldIdent(FieldIdent(ident)), annotations))
+            })
+            .collect::<parse::Result<Vec<_>>>()?
+            .into_iter()
+            .collect(),
+        Fields::Unnamed(fields) => fields
+            .iter()
+            .enumerate()
+            .map(|(pos, field)| {
+                let annotations = extract_field_annotations(field)?;
+                Ok((FieldRef::FieldPos(pos), annotations))
+            })
+            .collect::<parse::Result<Vec<_>>>()?
+            .into_iter()
+            .collect(),
+    };
 
     Ok(VariantAnnotations {
         variant_annotations,
@@ -253,39 +291,45 @@ fn extract_variant_annotations(variant: &Variant) -> syn::Result<VariantAnnotati
     })
 }
 
-fn extract_field_annotations(field: &Field) -> syn::Result<FieldAnnotations> {
+fn extract_field_annotations(field: &Field) -> parse::Result<FieldAnnotations> {
     let fields_annotations = field.attrs.iter()
-        .filter(|attr| attr.path().is_ident("enum_from"))
+        .filter(|attr| attr.path_is_ident("enum_from"))
         .map(|attr| {
             let build_err = || {
-                syn::Error::new(
-                    attr.span(),
+                parse::Error::new(
+                    attr.span,
                     "expected a list of field names, for example #[enum_from(Source1::VariantA.field_x, Source2::VariantB.field_y)]",
                 )
             };
 
-            match &attr.meta {
-                Meta::Path(_) | Meta::NameValue(_) => Err(build_err()),
-                Meta::List(meta_list) => {
-                    meta_list.parse_args_with(|input: ParseStream| {
-                        Punctuated::<FieldAnnotation, Token![,]>::parse_terminated(input)
-                            .and_then(|annotations| {
-                                if annotations.empty_or_trailing() {
-                                    Err(build_err())
-                                } else {
-                                    Ok(annotations.into_iter().collect())
-                                }
-                            })
-                    })
+            if attr.is_path() || attr.is_name_value() {
+                Err(build_err())
+            } else if attr.is_list() {
+                let args = attr.parse_args()?;
+                let mut stream = ParseStream::new(args);
+
+                if stream.is_empty() {
+                    return Err(build_err());
                 }
+
+                let annotations = stream.parse_terminated(parse_field_annotation)?;
+                stream.expect_empty()?;
+
+                if annotations.is_empty() {
+                    return Err(build_err());
+                }
+
+                Ok(annotations)
+            } else {
+                Err(build_err())
             }
-        }).collect::<Result<Vec<Vec<FieldAnnotation>>, syn::Error>>()?
+        }).collect::<parse::Result<Vec<Vec<FieldAnnotation>>>>()?
         .into_iter()
         .flatten()
         .collect();
 
     Ok(FieldAnnotations {
         fields_annotations,
-        field_span: field.span(),
+        field_span: field.span,
     })
 }

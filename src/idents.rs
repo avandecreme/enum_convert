@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
+use proc_macro2::Ident;
 use quote::ToTokens;
-use syn::Ident;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ContainerIdent(pub Ident);

@@ -30,7 +30,6 @@ dependencies = [
  "enum_to_enum",
  "proc-macro2",
  "quote",
- "syn 2.0.105",
  "trybuild",
 ]
 
